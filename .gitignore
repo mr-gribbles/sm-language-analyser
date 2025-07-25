@@ -1,0 +1,24 @@
+# --- Environment & Credentials ---
+# NEVER commit your secret keys!
+.env
+
+# --- Python ---
+# Ignore the virtual environment folder
+.venv/
+venv/
+
+# Ignore Python's cache files
+__pycache__/
+*.pyc
+
+# --- Generated Data ---
+# Ignore the corpus data directory to avoid uploading large files
+corpus_data/
+corpora/
+
+# --- IDE & OS ---
+# Ignore VS Code specific settings
+.vscode/
+
+# Ignore macOS specific files
+.DS_Store
