@@ -86,7 +86,7 @@ A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` er
 
 ## Authors
 
-* **mr-gribbles**
+* **Logan Barrington**
 * [@mr-gribbles](https://github.com/mr-gribbles)
 
 ## Version History
