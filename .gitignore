@@ -1,7 +1,6 @@
 # --- Environment & Credentials ---
 # NEVER commit your secret keys!
 .env
-reddit-bot-project.code-workspace
 
 # --- Python ---
 # Ignore the virtual environment folder
@@ -20,6 +19,7 @@ corpora/
 # --- IDE & OS ---
 # Ignore VS Code specific settings
 .vscode/
+*.code-workspace
 
 # Ignore macOS specific files
 .DS_Store
