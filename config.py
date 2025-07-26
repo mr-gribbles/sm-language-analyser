@@ -9,7 +9,7 @@ SUBREDDIT_LIST = [
     "CasualConversation",
     "self",
     "tifu",
-    "AmItheAsshole"
+    "AmItheAsshole",
     "TodayILearned"
 ]
 
@@ -19,7 +19,7 @@ def get_target_subreddit():
 
 # --- GENERAL PIPELINE SETTINGS ---
 # The total number of unique posts you want to collect in a single run.
-NUM_POSTS_TO_COLLECT = 100
+NUM_POSTS_TO_COLLECT = 1000
 
 # --- API & CLIENT SETTINGS ---
 # The number of posts to fetch from Reddit in a single API call for sampling.
