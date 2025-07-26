@@ -37,6 +37,11 @@ This project provides a comprehensive, end-to-end solution for building high-qua
     ```bash
     python setup_env.py
     ```
+     #### Where to Find Your API Keys
+    * **Reddit Client ID & Secret:** Log in to Reddit, then create a new "script" application at [**reddit.com/prefs/apps**](https://www.reddit.com/prefs/apps).
+    * **Google Gemini API Key:** Go to [**Google AI Studio**](https://aistudio.google.com/app/apikey) and click "Create API key".
+    * **Bluesky App Password:** In the Bluesky app, go to Settings > Advanced > App Passwords to generate a new password. **Do not use your main account password.**
+    
 2.  **Choose a pipeline to run.** Based on the data you want to collect, run one of the following main scripts from your terminal:
 
     * To collect **original, untouched posts from Reddit**:
