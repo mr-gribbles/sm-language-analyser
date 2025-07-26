@@ -60,6 +60,17 @@ This project provides a comprehensive, end-to-end solution for building high-qua
     python analyze_corpus.py path/to/your/corpus_file.jsonl
     ```
 
+4.  **Combine Corpus Files (Optional).** After running the collection pipelines multiple times, you can combine the smaller `.jsonl` files into a single, larger file for easier analysis. This script will also delete the original files after a successful merge.
+
+    * To combine all **original** corpus files:
+        ```bash
+        python combine_corpora.py corpora/original_only
+        ```
+    * To combine all **rewritten** corpus files:
+        ```bash
+        python combine_corpora.py corpora/rewritten_pairs
+        ```
+
 ## Help
 
 A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` error when the analysis script tries to download NLTK data. If this happens, you have two options:
