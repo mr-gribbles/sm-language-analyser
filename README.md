@@ -41,7 +41,7 @@ This project provides a comprehensive, end-to-end solution for building high-qua
     * **Reddit Client ID & Secret:** Log in to Reddit, then create a new "script" application at [**reddit.com/prefs/apps**](https://www.reddit.com/prefs/apps).
     * **Google Gemini API Key:** Go to [**Google AI Studio**](https://aistudio.google.com/app/apikey) and click "Create API key".
     * **Bluesky App Password:** In the Bluesky app, go to Settings > Advanced > App Passwords to generate a new password. **Do not use your main account password.**
-    
+
 2.  **Choose a pipeline to run.** Based on the data you want to collect, run one of the following main scripts from your terminal:
 
     * To collect **original, untouched posts from Reddit**:
@@ -61,10 +61,16 @@ This project provides a comprehensive, end-to-end solution for building high-qua
         python main_bluesky_rewriter.py
         ```
 3.  **Analyze a generated corpus file.** Once a `.jsonl` file has been created, you can run the analysis pipeline on it:
-    ```bash
-    python analyze_corpus.py path/to/your/corpus_file.jsonl
-    ```
-
+    * To analyse an **original** corpus file:
+        ```bash
+        python analyze_corpus.py corpora/original_only/corpus_file.jsonl
+        ```
+    * To analyse a **rewritten** corpus file:
+        ```bash
+        python analyze_corpus.py corpora/rewritten_pairs/corpus_file.jsonl
+        ```
+    Replace `corpus_file.jsonl` with the name of a generated corpus file.
+    
 4.  **Combine Corpus Files (Optional).** After running the collection pipelines multiple times, you can combine the smaller `.jsonl` files into a single, larger file for easier analysis. This script will also delete the original files after a successful merge.
 
     * To combine all **original** corpus files:
