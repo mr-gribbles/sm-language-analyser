@@ -2,7 +2,7 @@ import random
 from atproto_client.models.app.bsky.feed.post import Record
 
 # Import the authenticated client instance
-from bluesky_client import bluesky_client
+from src.clients.bluesky_client import bluesky_client
 
 def get_random_bluesky_post(limit=100):
     """

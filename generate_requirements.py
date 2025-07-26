@@ -16,7 +16,9 @@ packages = {
     "# --- Machine Learning & NLP (for Evaluation & Analysis) ---": [
         "scikit-learn==1.5.1",    # For classical ML algorithms, metrics, and evaluation tools
         "torch==2.4.0",           # Core deep learning framework (PyTorch)
-        "transformers==4.42.4"    # Provides access to pre-trained models for evaluation (from Hugging Face)
+        "transformers==4.42.4",   # Provides access to pre-trained models for evaluation (from Hugging Face)
+        "textstat==0.7.8",        # For text statistics and analysis
+        "nltk==3.9.1",            # Natural Language Toolkit for text processing
     ],
     "# --- Utilities ---": [
         "python-dotenv==1.0.1"    # For managing API keys and environment variables securely
