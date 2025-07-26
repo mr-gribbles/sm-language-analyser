@@ -28,7 +28,7 @@ def main():
     while len(collected_ids) < config.NUM_POSTS_TO_COLLECT:
         # 1. Scrape: Get a random subreddit and then a random post
         target_subreddit = config.get_target_subreddit()
-        post = get_random_text_post(target_subreddit, limit=config.REDDIT_SAMPLE_LIMIT)
+        post = get_random_text_post(target_subreddit, limit=config.SAMPLE_LIMIT)
 
         if post and post.id not in collected_ids:
             # 2. Clean: Process the raw text
@@ -45,7 +45,7 @@ def main():
             if rewritten_text:
                 # Set the filename on the first successful collection
                 if not output_filename:
-                    output_filename = f"rewritten_{timestamp}.jsonl"
+                    output_filename = f"reddit_rewritten_{timestamp}.jsonl"
 
                 # 4. Structure & Save: Create the record with all data
                 record = create_corpus_record(

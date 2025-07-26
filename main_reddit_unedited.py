@@ -8,7 +8,7 @@ from corpus_manager import create_corpus_record, save_record_to_corpus
 
 def main():
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
-    output_filename = f"original_posts_{timestamp}.jsonl"
+    output_filename = f"reddit_original_{timestamp}.jsonl"
     
     print("--- Starting Unedited Corpus Collection Pipeline ---")
     print(f"Posts to Collect: {config.NUM_POSTS_TO_COLLECT}")
@@ -22,7 +22,7 @@ def main():
         # Get a new random subreddit for each iteration
         target_subreddit = config.get_target_subreddit()
         
-        post = get_random_text_post(target_subreddit, limit=config.REDDIT_SAMPLE_LIMIT)
+        post = get_random_text_post(target_subreddit, limit=config.SAMPLE_LIMIT)
 
         if post and post.id not in collected_ids:
             cleaned_text = clean_text(post.selftext)

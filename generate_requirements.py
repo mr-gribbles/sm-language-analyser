@@ -1,6 +1,7 @@
 packages = {
-    "# --- Core Reddit API Interaction ---": [
-        "praw==7.7.1"  # The Python Reddit API Wrapper for data sourcing
+    "# --- Core Social Media API Interaction ---": [
+        "praw==7.8.1",  # The Python Reddit API Wrapper for data sourcing
+        "atproto==0.0.61",  # For interacting with Bluesky's AT Protocol
     ],
     "# --- LLM API Clients ---": [
         "openai==1.35.13",          # For interacting with OpenAI models (GPT-4, etc.)

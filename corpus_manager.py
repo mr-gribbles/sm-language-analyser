@@ -1,22 +1,13 @@
-# corpus_manager.py
 import os
 import json
 import uuid
+from datetime import datetime, timezone
 
-def create_corpus_record(post, cleaned_text):
-    """
-    Structures the collected data into the official corpus JSON format.
-    
-    Args:
-        post: The PRAW Submission object from the scraper.
-        cleaned_text: The cleaned version of the post's selftext.
-
-    Returns:
-        A dictionary representing the structured corpus record.
-    """
-    return {
+# --- Reddit Record Creator (No Changes) ---
+def create_reddit_corpus_record(post, cleaned_text, rewritten_text=None, llm_model=None, prompt_template=None):
+    record = {
         "corpus_item_id": str(uuid.uuid4()),
-        "version": "1.0",
+        "version": "1.1",
         "source_details": {
             "platform": "Reddit",
             "post_id": post.id,
@@ -30,25 +21,56 @@ def create_corpus_record(post, cleaned_text):
         },
         "llm_transformation": None
     }
+    if rewritten_text and llm_model and prompt_template:
+        record["llm_transformation"] = {
+            "model_used": llm_model,
+            "prompt_template": prompt_template,
+            "rewritten_text": rewritten_text,
+            "transformation_timestamp_utc": datetime.now(timezone.utc).isoformat()
+        }
+    return record
 
-def save_record_to_corpus(record, directory, filename):
+# --- Bluesky Record Creator ---
+def create_bluesky_corpus_record(post, cleaned_text, rewritten_text=None, llm_model=None, prompt_template=None):
     """
-    Appends a single JSON record to the specified JSONL file.
-    Creates the directory and file if they don't exist.
+    Structures collected Bluesky data into the official corpus JSON format.
+    """
+    # Extract the post's unique record key (rkey) from its URI
+    post_rkey = post.uri.split('/')[-1]
     
-    Args:
-        record: The dictionary to save.
-        directory: The folder to save the file in.
-        filename: The name of the file.
-    """
+    record = {
+        "corpus_item_id": str(uuid.uuid4()),
+        "version": "1.1",
+        "source_details": {
+            "platform": "Bluesky",
+            "post_uri": post.uri,
+            "post_cid": str(post.cid),
+            "author_did": post.author.did,
+            "author_handle": post.author.handle
+        },
+        "original_content": {
+            # Bluesky posts don't have titles, so we use the first 70 chars as a pseudo-title
+            "title": (post.record.text[:70] + '...') if len(post.record.text) > 70 else post.record.text,
+            "raw_text": post.record.text,
+            "cleaned_text": cleaned_text
+        },
+        "llm_transformation": None
+    }
+    if rewritten_text and llm_model and prompt_template:
+        record["llm_transformation"] = {
+            "model_used": llm_model,
+            "prompt_template": prompt_template,
+            "rewritten_text": rewritten_text,
+            "transformation_timestamp_utc": datetime.now(timezone.utc).isoformat()
+        }
+    return record
+
+# --- Save Function ---
+def save_record_to_corpus(record, directory, filename):
     try:
-        # Ensure the output directory exists
         os.makedirs(directory, exist_ok=True)
         filepath = os.path.join(directory, filename)
-        
-        # Open the file in append mode and write the record as a new line
         with open(filepath, 'a', encoding='utf-8') as f:
             f.write(json.dumps(record) + '\n')
-            
     except IOError as e:
         print(f"Error: Could not write to file {filepath}. Details: {e}")

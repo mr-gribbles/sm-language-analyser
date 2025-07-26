@@ -3,7 +3,6 @@ import random
 # --- SUBREDDIT SETTINGS ---
 # A list of subreddits to randomly choose from for each post collection.
 SUBREDDIT_LIST = [
-    "AskReddit",
     "TrueOffMyChest",
     "explainlikeimfive",
     "NoStupidQuestions",
@@ -11,6 +10,7 @@ SUBREDDIT_LIST = [
     "self",
     "tifu",
     "AmItheAsshole"
+    "TodayILearned"
 ]
 
 def get_target_subreddit():
@@ -23,7 +23,7 @@ NUM_POSTS_TO_COLLECT = 100
 
 # --- API & CLIENT SETTINGS ---
 # The number of posts to fetch from Reddit in a single API call for sampling.
-REDDIT_SAMPLE_LIMIT = 200
+SAMPLE_LIMIT = 100
 # A polite delay (in seconds) between API calls.
 SLEEP_TIMER = 4.5
 

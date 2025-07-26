@@ -1,9 +1,17 @@
 # llm_rewriter.py
 import os
 import google.generativeai as genai
+from dotenv import load_dotenv
+
+# --- FIX ---
+# Ensure environment variables from .env are loaded before they are used.
+# This makes the module self-sufficient and robust.
+load_dotenv()
 
 # Load the API key from the .env file
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Configure the API client
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 else:
