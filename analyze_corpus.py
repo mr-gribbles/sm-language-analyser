@@ -6,6 +6,7 @@ from src.core_logic.corpus_analyzer import run_full_analysis
 def analyze_corpus_file(filepath: str):
     """
     Loads a JSONL corpus file and runs analysis.
+    - Intelligently finds the correct text field for both Reddit and Bluesky corpora.
     - If the file contains rewritten text, ONLY the rewritten text is analyzed.
     - If the file contains only original text, the original text is analyzed.
     """
@@ -14,7 +15,7 @@ def analyze_corpus_file(filepath: str):
         return
 
     results = []
-    analysis_type = "Unknown"  # To label the final report
+    analysis_type = "Unknown"
     print(f"Analyzing corpus file: {filepath}...")
 
     try:
@@ -23,20 +24,21 @@ def analyze_corpus_file(filepath: str):
                 try:
                     record = json.loads(line)
                     
-                    # Check if a rewritten version exists in the record
                     rewritten_text = record.get("llm_transformation", {}).get("rewritten_text") if record.get("llm_transformation") else None
                     
                     if rewritten_text:
-                        # This is a rewritten corpus, so we ONLY analyze the rewritten text.
                         if i == 0: analysis_type = "Rewritten Text"
                         analysis_results = run_full_analysis(rewritten_text)
                     else:
-                        # This is an original-only corpus, so we analyze the original text.
                         if i == 0: analysis_type = "Original Text"
-                        original_text = record.get("original_content", {}).get("cleaned_selftext", "")
-                        analysis_results = run_full_analysis(original_text)
+                        original_content = record.get("original_content", {})
+                        
+                        # --- FIX: Check for both possible key names ---
+                        # This makes the script compatible with both Reddit and Bluesky files.
+                        text_to_analyze = original_content.get("cleaned_selftext") or original_content.get("cleaned_text", "")
+                        
+                        analysis_results = run_full_analysis(text_to_analyze)
 
-                    # Append the relevant analysis to our results
                     row = {
                         "corpus_item_id": record.get("corpus_item_id"),
                         **analysis_results
@@ -47,7 +49,6 @@ def analyze_corpus_file(filepath: str):
                     print(f"Warning: Skipping malformed line in {filepath}")
                     continue
         
-        # --- Generate Summary Report ---
         df = pd.DataFrame(results)
         
         print(f"\n--- Corpus Analysis Summary ({analysis_type}) ---")
