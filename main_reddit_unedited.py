@@ -1,16 +1,16 @@
 import time
 from datetime import datetime, timezone
 import config
-from reddit_client import reddit
-from reddit_scraper import get_random_text_post
-from data_cleaner import clean_text
-from corpus_manager import create_corpus_record, save_record_to_corpus
+from src.clients.reddit_client import reddit
+from src.scrapers.reddit_scraper import get_random_text_post
+from src.core_logic.data_cleaner import clean_text
+from src.core_logic.corpus_manager import create_reddit_corpus_record, save_record_to_corpus
 
 def main():
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
     output_filename = f"reddit_original_{timestamp}.jsonl"
     
-    print("--- Starting Unedited Corpus Collection Pipeline ---")
+    print("--- Starting Reddit Unedited Collection Pipeline ---")
     print(f"Posts to Collect: {config.NUM_POSTS_TO_COLLECT}")
     print(f"Output File: {config.ORIGINAL_ONLY_DIR}/{output_filename}")
     print("-------------------------------------------")
@@ -18,15 +18,12 @@ def main():
     collected_ids = set()
 
     while len(collected_ids) < config.NUM_POSTS_TO_COLLECT:
-        # --- KEY CHANGE HERE ---
-        # Get a new random subreddit for each iteration
         target_subreddit = config.get_target_subreddit()
-        
         post = get_random_text_post(target_subreddit, limit=config.SAMPLE_LIMIT)
 
         if post and post.id not in collected_ids:
             cleaned_text = clean_text(post.selftext)
-            record = create_corpus_record(post, cleaned_text)
+            record = create_reddit_corpus_record(post, cleaned_text)
             save_record_to_corpus(record, config.ORIGINAL_ONLY_DIR, output_filename)
             
             collected_ids.add(post.id)

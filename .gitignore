@@ -1,6 +1,7 @@
 # --- Environment & Credentials ---
 # NEVER commit your secret keys!
 .env
+reddit-bot-project.code-workspace
 
 # --- Python ---
 # Ignore the virtual environment folder
