@@ -1,6 +1,7 @@
 import time
 from datetime import datetime, timezone
 import config
+
 from src.clients.reddit_client import reddit
 from src.scrapers.reddit_scraper import get_random_text_post
 from src.core_logic.data_cleaner import clean_text
@@ -8,9 +9,6 @@ from src.core_logic.llm_rewriter import rewrite_text_with_gemini
 from src.core_logic.corpus_manager import create_reddit_corpus_record, save_record_to_corpus
 
 def main():
-    """
-    Main orchestration function to run the full rewriting pipeline.
-    """
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
     output_filename = f"reddit_rewritten_{timestamp}.jsonl"
     
@@ -26,8 +24,12 @@ def main():
         post = get_random_text_post(target_subreddit, limit=config.SAMPLE_LIMIT)
 
         if post and post.id not in collected_ids:
-            cleaned_text = clean_text(post.selftext)
-            
+            try:
+                cleaned_text = clean_text(post.selftext)
+            except TypeError as e:
+                print(f"Warning: Skipping post ID {post.id} due to invalid text content. Error: {e}")
+                continue
+
             rewritten_text = rewrite_text_with_gemini(
                 text_to_rewrite=cleaned_text,
                 model_name=config.LLM_MODEL,
@@ -36,11 +38,8 @@ def main():
 
             if rewritten_text:
                 record = create_reddit_corpus_record(
-                    post=post,
-                    cleaned_text=cleaned_text,
-                    rewritten_text=rewritten_text,
-                    llm_model=config.LLM_MODEL,
-                    prompt_template=config.REWRITE_PROMPT_TEMPLATE
+                    post=post, cleaned_text=cleaned_text, rewritten_text=rewritten_text,
+                    llm_model=config.LLM_MODEL, prompt_template=config.REWRITE_PROMPT_TEMPLATE
                 )
                 save_record_to_corpus(record, config.REWRITTEN_PAIRS_DIR, output_filename)
                 

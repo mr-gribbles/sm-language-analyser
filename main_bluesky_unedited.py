@@ -22,7 +22,6 @@ def main():
     cursor = None
 
     while len(collected_uris) < config.NUM_POSTS_TO_COLLECT:
-        # If the buffer is empty, fetch a new page of posts
         if not post_buffer:
             print("Post buffer is empty. Fetching a new page from the timeline...")
             new_posts, cursor = fetch_bluesky_timeline_page(limit=config.SAMPLE_LIMIT, cursor=cursor)
@@ -38,13 +37,17 @@ def main():
             time.sleep(20)
             continue
 
-        # Process the next post from the buffer
         post = post_buffer.pop(0)
         
         if post.uri in collected_uris:
             continue
 
-        cleaned_text = clean_text(post.record.text)
+        try:
+            cleaned_text = clean_text(post.record.text)
+        except TypeError as e:
+            print(f"Warning: Skipping post URI {post.uri} due to invalid text content. Error: {e}")
+            continue
+
         record = create_bluesky_corpus_record(
             post=post,
             cleaned_text=cleaned_text

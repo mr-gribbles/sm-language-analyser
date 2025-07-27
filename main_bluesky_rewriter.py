@@ -1,6 +1,7 @@
 import time
 from datetime import datetime, timezone
 import config
+
 from src.core_logic.data_cleaner import clean_text
 from src.core_logic.llm_rewriter import rewrite_text_with_gemini
 from src.core_logic.corpus_manager import create_bluesky_corpus_record, save_record_to_corpus
@@ -21,34 +22,41 @@ def main():
     collected_uris = set()
     post_buffer = []
     cursor = None
+    empty_fetch_attempts = 0
 
     while len(collected_uris) < config.NUM_POSTS_TO_COLLECT:
-        # If the buffer is empty, fetch a new page of posts from Bluesky
         if not post_buffer:
             print("Post buffer is empty. Fetching a new page from the timeline...")
             new_posts, cursor = fetch_bluesky_timeline_page(limit=config.SAMPLE_LIMIT, cursor=cursor)
             
-            if not new_posts:
-                print("Failed to fetch new posts or reached the end of the timeline. Stopping.")
+            if not new_posts and cursor is None:
+                print("Failed to fetch new posts and no cursor returned. Stopping.")
                 break
             
-            # Add only new, unseen posts to our buffer
-            post_buffer.extend([p for p in new_posts if p.uri not in collected_uris])
+            unique_new_posts = [p for p in new_posts if p.uri not in collected_uris]
+            post_buffer.extend(unique_new_posts)
 
-        # If the buffer is still empty after a fetch, wait and try again
         if not post_buffer:
-            print("No new unique posts found on this page. Waiting before retrying...")
-            time.sleep(20) # Wait longer if a page yields no new content
+            empty_fetch_attempts += 1
+            print(f"No new unique posts found on this page. Attempt {empty_fetch_attempts}/3.")
+            if empty_fetch_attempts >= 3:
+                print("Failed to find new posts after 3 attempts. Stopping pipeline.")
+                break
+            time.sleep(10) 
             continue
-
-        # Process the next post from the front of the buffer
+        
+        empty_fetch_attempts = 0
         post = post_buffer.pop(0)
         
-        # This check is redundant but safe
         if post.uri in collected_uris:
             continue
 
-        cleaned_text = clean_text(post.record.text)
+        try:
+            cleaned_text = clean_text(post.record.text)
+        except TypeError as e:
+            print(f"Warning: Skipping post URI {post.uri} due to invalid text content. Error: {e}")
+            continue
+
         rewritten_text = rewrite_text_with_gemini(
             text_to_rewrite=cleaned_text,
             model_name=config.LLM_MODEL,

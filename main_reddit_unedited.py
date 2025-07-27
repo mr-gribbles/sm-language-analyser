@@ -1,6 +1,7 @@
 import time
 from datetime import datetime, timezone
 import config
+
 from src.clients.reddit_client import reddit
 from src.scrapers.reddit_scraper import get_random_text_post
 from src.core_logic.data_cleaner import clean_text
@@ -22,7 +23,12 @@ def main():
         post = get_random_text_post(target_subreddit, limit=config.SAMPLE_LIMIT)
 
         if post and post.id not in collected_ids:
-            cleaned_text = clean_text(post.selftext)
+            try:
+                cleaned_text = clean_text(post.selftext)
+            except TypeError as e:
+                print(f"Warning: Skipping post ID {post.id} due to invalid text content. Error: {e}")
+                continue
+
             record = create_reddit_corpus_record(post, cleaned_text)
             save_record_to_corpus(record, config.ORIGINAL_ONLY_DIR, output_filename)
             
