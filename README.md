@@ -26,8 +26,9 @@ This project provides a comprehensive, end-to-end solution for building high-qua
     python3 -m venv .venv
     source .venv/bin/activate
     ```
-3.  **Install all required packages**:
+3.  **Generate then install all required packages**:
     ```bash
+    python generate_requirments.py
     pip install -r requirements.txt
     ```
 
