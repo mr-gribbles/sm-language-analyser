@@ -1,3 +1,17 @@
+"""Analysis module for text data.
+
+This module provides functions to analyze text data for readability,
+lexical diversity, and sentiment. It uses the `textstat` library for
+readability scores, NLTK for lexical diversity and sentiment analysis,
+and handles potential issues with NLTK data downloads gracefully.
+It also includes error handling for SSL certificate issues that can
+occur on certain systems, particularly macOS.
+
+It ensures that all necessary NLTK resources are available before
+performing any analysis, and provides clear instructions for users
+if initialization fails.
+"""
+
 import textstat
 import nltk
 import ssl
@@ -54,7 +68,15 @@ except Exception as e:
     sys.exit(1) # Exit the script gracefully.
 
 def analyze_readability(text: str) -> dict:
-    """Calculates readability scores for a given text."""
+    """Calculates readability scores for a given text.
+    
+    Keyword arguments:
+    text -- The text to analyze (should be a string with at least 10 words).
+
+    Returns:
+    A dictionary containing the Flesch Reading Ease and Flesch-Kincaid Grade Level scores.
+    If the text is too short or not a string, returns None for both scores.
+    """
     if not text or not isinstance(text, str) or len(text.split()) < 10:
         return {
             "flesch_reading_ease": None,
@@ -66,7 +88,15 @@ def analyze_readability(text: str) -> dict:
     }
 
 def analyze_lexical_diversity(text: str) -> dict:
-    """Calculates the Type-Token Ratio (TTR) for a text."""
+    """Calculates the Type-Token Ratio (TTR) for a text.
+    
+    Keyword arguments:
+    text -- The text to analyze (should be a string).
+    
+    Returns:
+    A dictionary containing the TTR score.
+    If the text is empty or not a string, returns TTR as None.
+    """
     if not text or not isinstance(text, str):
         return {"ttr": None}
     
@@ -79,7 +109,15 @@ def analyze_lexical_diversity(text: str) -> dict:
     return {"ttr": ttr}
 
 def analyze_sentiment(text: str) -> dict:
-    """Performs VADER sentiment analysis on a text."""
+    """Performs VADER sentiment analysis on a text.
+    
+    Keyword arguments:
+    text -- The text to analyze (should be a string).
+    
+    Returns:
+    A dictionary containing positive, negative, neutral, and compound sentiment scores.
+    If the text is empty or not a string, returns None for all scores.
+    """
     if not text or not isinstance(text, str):
         return {
             "sentiment_positive": None,
@@ -96,7 +134,15 @@ def analyze_sentiment(text: str) -> dict:
         "sentiment_compound": scores['compound']
     }
 def run_full_analysis(text: str) -> dict:
-    """Runs all text analyses and combines them into a single dictionary."""
+    """Runs all text analyses and combines them into a single dictionary.
+    
+    Keyword arguments:
+    text -- The text to analyze (should be a string).
+    
+    Returns:
+    A dictionary containing all analysis results: readability, lexical diversity, and sentiment.
+    If the text is empty or not a string, returns an empty dictionary.
+    """
     if not text:
         return {}
         

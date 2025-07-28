@@ -1,23 +1,42 @@
+"""This module provides a function to scrape Reddit for pure text posts.
+
+It filters out posts that contain images in their body and returns a random post
+from a specified subreddit.
+"""
 import random
 from src.clients.reddit_client import reddit
+
+IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
 
 def get_random_text_post(subreddit_name, limit=100):
     """
     Fetches a random, non-empty, pure text post from a given subreddit,
     filtering out posts that contain image links in their body.
+
+    Keyword arguments:
+    subreddit_name -- The name of the subreddit to scrape.
+    limit -- The maximum number of posts to fetch from the subreddit (default is 100).
+
+    Returns:
+    A random pure text post object if available, otherwise None.
+    If no pure text posts are found, it returns None and prints a message.
+    If the Reddit client is not initialized, it returns None and prints an error message.   
     """
     if not reddit:
         print("Reddit instance not available.")
         return None
-
+    
     try:
         subreddit = reddit.subreddit(subreddit_name)
         print(f"Searching for pure text posts in r/{subreddit_name}...")
         hot_posts = subreddit.hot(limit=limit)
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+        
+        # Filter out posts that contain images in their body
+        # and ensure the post is a self post with non-empty selftext.
+        # This will also exclude posts with very short text.
         pure_text_posts = [
             post for post in hot_posts 
-            if post.is_self and post.selftext and not any(ext in post.selftext.lower() for ext in image_extensions)
+            if post.is_self and post.selftext and not any(ext in post.selftext.lower() for ext in IMAGE_EXTENSIONS)
         ]
         
         if pure_text_posts:

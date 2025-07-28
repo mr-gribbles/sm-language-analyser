@@ -1,11 +1,15 @@
-# setup_env.py
+"""Generate a .env file for API credentials interactively.
+
+This script prompts the user for various API credentials and saves them in a .env file.
+It ensures that the .env file is created securely and can be used by other scripts in the project.
+It includes error handling for existing .env files and allows the user to overwrite them if desired.
+It uses getpass for secure input of sensitive information like API keys and passwords.
+"""
 import os
 import getpass
 
 def create_env_file():
-    """
-    Interactively prompts the user for all API credentials and generates a .env file.
-    """
+    """Create a .env file with API credentials interactively."""
     print("--- Interactive API Credential Setup ---")
     print("This script will create a .env file to securely store your API keys.")
     print("-" * 40)

@@ -1,3 +1,16 @@
+"""Analyze and save a text corpus file for linguistic metrics.
+
+This script intelligently handles both original and rewritten text from Reddit and Bluesky corpora.
+It performs the following:
+- Loads a JSONL corpus file.
+- Analyzes the text for readability, lexical diversity, and sentiment.
+- Saves the results to a CSV file.
+- Provides a summary of the analysis results.
+- Handles errors gracefully and logs warnings for malformed lines.
+- Uses argparse for command-line interface.
+It ensures that the analysis is performed on the correct text field, whether it is original or rewritten text.
+It also includes error handling for file not found and unexpected errors.
+"""
 import json
 import pandas as pd
 import argparse
@@ -5,10 +18,13 @@ from src.core_logic.corpus_analyzer import run_full_analysis
 
 def analyze_corpus_file(filepath: str):
     """
-    Loads a JSONL corpus file and runs analysis.
-    - Intelligently finds the correct text field for both Reddit and Bluesky corpora.
-    - If the file contains rewritten text, ONLY the rewritten text is analyzed.
-    - If the file contains only original text, the original text is analyzed.
+    Analyzes a corpus file for linguistic metrics and saves the results to a CSV file.
+
+    Keyword arguments:
+    filepath -- The path to the .jsonl corpus file to analyze.  
+
+    Returns:
+    None. The results are saved to a CSV file with the same name as the input file
     """
     if not filepath.endswith('.jsonl'):
         print("Error: Please provide a valid .jsonl file.")
@@ -33,8 +49,6 @@ def analyze_corpus_file(filepath: str):
                         if i == 0: analysis_type = "Original Text"
                         original_content = record.get("original_content", {})
                         
-                        # --- FIX: Check for both possible key names ---
-                        # This makes the script compatible with both Reddit and Bluesky files.
                         text_to_analyze = original_content.get("cleaned_selftext") or original_content.get("cleaned_text", "")
                         
                         analysis_results = run_full_analysis(text_to_analyze)

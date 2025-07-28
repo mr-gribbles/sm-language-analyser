@@ -23,7 +23,8 @@ NUM_POSTS_TO_COLLECT = 1000
 
 # --- API & CLIENT SETTINGS ---
 # The number of posts to fetch from Reddit in a single API call for sampling.
-SAMPLE_LIMIT = 100
+REDDIT_SAMPLE_LIMIT = 1000
+BLUESKY_SAMPLE_LIMIT = 100
 # A polite delay (in seconds) between API calls.
 SLEEP_TIMER = 4.5
 

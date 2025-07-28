@@ -1,3 +1,11 @@
+"""Bluesky Rewriter Pipeline
+
+This script orchestrates the collection and rewriting of posts from Bluesky.
+It fetches posts from the user's timeline, cleans the text, rewrites it using a specified
+LLM, and saves the results in a structured format.
+It handles pagination, ensures unique posts are processed, and manages API rate limits.
+It is designed to be efficient and robust, with error handling for common issues.
+"""
 import time
 from datetime import datetime, timezone
 import config
@@ -8,9 +16,7 @@ from src.core_logic.corpus_manager import create_bluesky_corpus_record, save_rec
 from src.scrapers.bluesky_scraper import fetch_bluesky_timeline_page
 
 def main():
-    """
-    Main orchestration function to run the full, efficient Bluesky rewriting pipeline.
-    """
+    """Main function to run the Bluesky Rewriter Pipeline."""
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
     output_filename = f"bluesky_rewritten_{timestamp}.jsonl"
     
@@ -23,19 +29,18 @@ def main():
     post_buffer = []
     cursor = None
     empty_fetch_attempts = 0
-
+    # Collect posts until the desired number is reached
+    # This loop will continue until we have collected the required number of unique posts
     while len(collected_uris) < config.NUM_POSTS_TO_COLLECT:
         if not post_buffer:
             print("Post buffer is empty. Fetching a new page from the timeline...")
-            new_posts, cursor = fetch_bluesky_timeline_page(limit=config.SAMPLE_LIMIT, cursor=cursor)
-            
+            new_posts, cursor = fetch_bluesky_timeline_page(limit=config.BLUESKY_SAMPLE_LIMIT, cursor=cursor)
             if not new_posts and cursor is None:
                 print("Failed to fetch new posts and no cursor returned. Stopping.")
                 break
-            
             unique_new_posts = [p for p in new_posts if p.uri not in collected_uris]
             post_buffer.extend(unique_new_posts)
-
+        # If no new posts were found, wait before retrying
         if not post_buffer:
             empty_fetch_attempts += 1
             print(f"No new unique posts found on this page. Attempt {empty_fetch_attempts}/3.")
@@ -44,25 +49,21 @@ def main():
                 break
             time.sleep(10) 
             continue
-        
         empty_fetch_attempts = 0
         post = post_buffer.pop(0)
-        
         if post.uri in collected_uris:
             continue
-
         try:
             cleaned_text = clean_text(post.record.text)
         except TypeError as e:
             print(f"Warning: Skipping post URI {post.uri} due to invalid text content. Error: {e}")
             continue
-
+        # Rewrite the text using the specified LLM
         rewritten_text = rewrite_text_with_gemini(
             text_to_rewrite=cleaned_text,
             model_name=config.LLM_MODEL,
             prompt_template=config.REWRITE_PROMPT_TEMPLATE
         )
-
         if rewritten_text:
             record = create_bluesky_corpus_record(
                 post=post,

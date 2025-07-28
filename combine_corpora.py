@@ -1,16 +1,24 @@
+"""Combine multiple .jsonl files into a single file and optionally delete the originals.
+
+This script searches for all .jsonl files in a specified directory, combines them into a single output file,
+and then deletes the original source files if the user confirms.
+It provides feedback on the number of files processed and the total number of records in the combined file.
+It uses argparse for command-line interface.
+It ensures that the output file is named based on the directory and current timestamp.
+"""
 import os
 import glob
 import argparse
 from datetime import datetime
 
 def combine_jsonl_files(directory: str):
-    """
-    Finds all .jsonl files in a specified directory, combines them
-    into a single output file inside that same directory, and then
-    deletes the original source files.
+    """Combines all .jsonl files in the specified directory into a single file.
 
-    Args:
-        directory: The path to the directory containing the .jsonl files.
+    Keyword arguments:
+    directory -- The path to the directory containing the .jsonl files to combine.
+    
+    Returns:
+    None. The combined results are saved to a new .jsonl file in the same directory
     """
     if not os.path.isdir(directory):
         print(f"Error: The directory '{directory}' does not exist.")
