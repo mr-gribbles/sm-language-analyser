@@ -46,7 +46,6 @@ def fetch_bluesky_timeline_page(limit=100, cursor=None):
             high_quality_text_posts = []
             for item in response.feed:
                 post = item.post
-                # --- FIX: Use the correct model classes from the new imports ---
                 if not (isinstance(post.record, Record) and post.record.text and 'en' in (post.record.langs or [])):
                     continue
                 if post.embed and isinstance(post.embed, EmbedImagesMain):

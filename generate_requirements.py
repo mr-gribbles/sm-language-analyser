@@ -11,13 +11,13 @@ packages = {
         "atproto==0.0.61",  # For interacting with Bluesky's AT Protocol
     ],
     "# --- LLM API Clients ---": [
-        "openai==1.35.13",          # For interacting with OpenAI models (GPT-4, etc.)
-        "google-generativeai==0.7.2", # For interacting with Google models (Gemini)
-        "anthropic==0.29.0"         # For interacting with Anthropic models (Claude)
+        "openai==1.97.1",          # For interacting with OpenAI models (GPT-4, etc.)
+        "google-generativeai==0.8.5", # For interacting with Google models (Gemini)
+        "anthropic==0.59.0"         # For interacting with Anthropic models (Claude)
     ],
     "# --- Data Cleaning and Handling ---": [
-        "beautifulsoup4==4.12.3", # For parsing HTML and cleaning text
-        "pandas==2.2.2",          # For data manipulation and analysis
+        "beautifulsoup4==4.13.4", # For parsing HTML and cleaning text
+        "pandas==2.3.1",          # For data manipulation and analysis
         "numpy==1.26.4"            # For numerical operations, often a dependency for ML libraries
     ],
     "# --- Machine Learning & NLP (for Evaluation & Analysis) ---": [
@@ -28,7 +28,7 @@ packages = {
         "nltk==3.9.1",            # Natural Language Toolkit for text processing
     ],
     "# --- Utilities ---": [
-        "python-dotenv==1.0.1"    # For managing API keys and environment variables securely
+        "python-dotenv==1.1.1"    # For managing API keys and environment variables securely
     ]
 }
 

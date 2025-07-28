@@ -20,6 +20,7 @@ corpora/
 # Ignore VS Code specific settings
 .vscode/
 *.code-workspace
+requirements.txt
 
 # Ignore macOS specific files
 .DS_Store
