@@ -18,7 +18,7 @@ packages = {
     "# --- Data Cleaning and Handling ---": [
         "beautifulsoup4==4.13.4", # For parsing HTML and cleaning text
         "pandas==2.3.1",          # For data manipulation and analysis
-        "numpy==1.26.4"            # For numerical operations, often a dependency for ML libraries
+        "numpy==1.23.5"            # For numerical operations, often a dependency for ML libraries
     ],
     "# --- Machine Learning & NLP (for Evaluation & Analysis) ---": [
         "scikit-learn==1.5.1",    # For classical ML algorithms, metrics, and evaluation tools
@@ -26,6 +26,7 @@ packages = {
         "transformers==4.42.4",   # Provides access to pre-trained models for evaluation (from Hugging Face)
         "textstat==0.7.8",        # For text statistics and analysis
         "nltk==3.9.1",            # Natural Language Toolkit for text processing
+        "conc==0.1.2"            # For advanced corpus analysis
     ],
     "# --- Utilities ---": [
         "python-dotenv==1.1.1"    # For managing API keys and environment variables securely
