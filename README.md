@@ -14,9 +14,9 @@ This guide will walk you through the entire process of setting up the project, c
 
 ### Step 1: Initial Setup
 
-1.  **Clone the repository** to your local machine:
+1.  **Clone this specific branch** to your local machine:
     ```bash
-    git clone https://github.com/mr-gribbles/sm-language-analyser.git
+    git clone https://github.com/mr-gribbles/sm-language-analyser.git --branch feature/web-gui
     cd sm-language-analyser
     ```
 2.  **Set up a Python virtual environment** to isolate dependencies. This is a crucial step to avoid conflicts with other projects.
