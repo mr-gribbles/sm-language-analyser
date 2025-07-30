@@ -112,6 +112,14 @@ A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` er
 
 ## Version History
 
+* **2.0**
+    * **Complete Codebase Refactor:** Overhauled the project structure for modularity and maintainability.
+    * **Unified Pipeline:** Replaced four separate main scripts with a single `main.py` entry point using command-line arguments.
+    * **Centralized Logic:** Moved all core data processing logic into a new `src/pipeline.py` module.
+    * **Improved Configuration:** Migrated all settings to a `.env` file, removing hardcoded values.
+    * **Standardized Naming:** Refactored function and variable names for clarity and consistency.
+    * **Added Unit Tests:** Integrated `pytest` and added an initial test suite for core logic.
+    * **Improved Directory Structure:** Created a `scripts` directory for utility scripts and a `tests` directory for all tests.
 * **0.3**
     * Added linguistic analysis pipeline (`analyze_corpus.py`).
     * Added Bluesky scraping and rewriting capabilities.
