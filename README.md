@@ -1,6 +1,6 @@
 # Social Media Language Analyser
 
-> **⚠️ This is a legacy version of the project and is no longer maintained. Please refer to the `main` branch for the latest version.**
+> **⚠️ This is a legacy version of the project and is no longer maintained. Please refer to the `v2.0-refactor` branch for the latest version.**
 
 A modular Python pipeline for sourcing, cleaning, rewriting, and analyzing text data from Reddit and Bluesky to create structured corpora for NLP research.
 
