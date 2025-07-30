@@ -4,7 +4,7 @@ It filters out posts that contain images in their body and returns a random post
 from a specified subreddit.
 """
 import random
-from src.clients.reddit_client import reddit
+from src.clients.reddit_client import reddit_client
 
 IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
 
@@ -22,12 +22,12 @@ def get_random_text_post(subreddit_name, limit=100):
     If no pure text posts are found, it returns None and prints a message.
     If the Reddit client is not initialized, it returns None and prints an error message.   
     """
-    if not reddit:
+    if not reddit_client:
         print("Reddit instance not available.")
         return None
     
     try:
-        subreddit = reddit.subreddit(subreddit_name)
+        subreddit = reddit_client.subreddit(subreddit_name)
         print(f"Searching for pure text posts in r/{subreddit_name}...")
         hot_posts = subreddit.hot(limit=limit)
         

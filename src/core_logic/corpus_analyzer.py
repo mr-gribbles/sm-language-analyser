@@ -19,37 +19,26 @@ import sys
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.tokenize import word_tokenize
 
-def _initialize_nltk_data():
+def initialize_nltk():
     """
     Handles downloading of required NLTK data and provides a clear
     error message if downloads fail due to SSL or other issues.
     """
     try:
-        # Attempt to create an unverified SSL context for systems with certificate issues.
-        _create_unverified_https_context = ssl._create_unverified_context
+        ssl._create_default_https_context = ssl._create_unverified_context
     except AttributeError:
-        pass
-    else:
-        ssl._create_default_https_context = _create_unverified_https_context
+        pass  # For systems where this is not needed
 
-    # Define the resources that need to be checked and downloaded.
-    required_resources = {
-        'tokenizers/punkt': 'punkt',
-        'sentiment/vader_lexicon.zip': 'vader_lexicon',
-        'tokenizers/punkt_tab': 'punkt_tab' # Added to handle the specific error
-    }
-
-    # Try to download the necessary NLTK resources.
-    for path, resource_id in required_resources.items():
+    required_resources = ["vader_lexicon", "punkt"]
+    for resource in required_resources:
         try:
-            nltk.data.find(path)
+            nltk.data.find(f"tokenizers/{resource}")
         except LookupError:
-            print(f"NLTK resource '{resource_id}' not found. Attempting to download...")
-            nltk.download(resource_id, quiet=True)
+            nltk.download(resource, quiet=True)
 
 # Run the initialization and catch potential failures.
 try:
-    _initialize_nltk_data()
+    initialize_nltk()
     sid = SentimentIntensityAnalyzer()
 except Exception as e:
     print("="*80)

@@ -11,11 +11,12 @@ import glob
 import argparse
 from datetime import datetime
 
-def combine_jsonl_files(directory: str):
+def combine_jsonl_files(directory: str, delete_originals: bool = False):
     """Combines all .jsonl files in the specified directory into a single file.
 
     Keyword arguments:
     directory -- The path to the directory containing the .jsonl files to combine.
+    delete_originals -- Whether to delete the original source files after combining.
     
     Returns:
     None. The combined results are saved to a new .jsonl file in the same directory
@@ -56,20 +57,12 @@ def combine_jsonl_files(directory: str):
         print(f"Successfully combined {len(source_files)} files into '{output_filename}'.")
         print(f"The combined file contains {total_lines} records.")
 
-        # Optionally delete the original source files
-        delete_originals = input("Do you want to delete the original source files? (y/n): ").strip().lower()
-        if delete_originals == 'y':
-            delete_originals = input("Are you sure? This cannot be undone. (y/n): ").strip().lower()
-            if delete_originals == 'y':
-                print("Deleting original source files...")
-                for filename in source_files:
-                    os.remove(filename)
-                    print(f"  -> Deleted {os.path.basename(filename)}")
-                print("Original files deleted.")
-            else:
-                print("Original files were not deleted.")
-        else:
-            print("Original files were not deleted.")
+        if delete_originals:
+            print("Deleting original source files...")
+            for filename in source_files:
+                os.remove(filename)
+                print(f"  -> Deleted {os.path.basename(filename)}")
+            print("Original files deleted.")
 
     except IOError as e:
         print(f"\nAn error occurred during file operations: {e}")
@@ -80,7 +73,8 @@ if __name__ == "__main__":
     # Set up command-line argument parsing to get the target directory
     parser = argparse.ArgumentParser(description="Combine multiple .jsonl corpus files and delete the originals.")
     parser.add_argument("directory", type=str, help="The path to the directory containing the .jsonl files to combine.")
+    parser.add_argument("--delete-originals", action="store_true", help="Delete the original source files after combining.")
     
     args = parser.parse_args()
     
-    combine_jsonl_files(args.directory)
+    combine_jsonl_files(args.directory, args.delete_originals)

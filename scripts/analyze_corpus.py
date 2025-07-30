@@ -14,6 +14,11 @@ It also includes error handling for file not found and unexpected errors.
 import json
 import pandas as pd
 import argparse
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from src.core_logic.corpus_analyzer import run_full_analysis
 
 def analyze_corpus_file(filepath: str):
@@ -40,18 +45,16 @@ def analyze_corpus_file(filepath: str):
                 try:
                     record = json.loads(line)
                     
-                    rewritten_text = record.get("llm_transformation", {}).get("rewritten_text") if record.get("llm_transformation") else None
-                    
-                    if rewritten_text:
+                    text_to_analyze = None
+                    if record.get("llm_transformation") and record["llm_transformation"].get("rewritten_text"):
+                        text_to_analyze = record["llm_transformation"]["rewritten_text"]
                         if i == 0: analysis_type = "Rewritten Text"
-                        analysis_results = run_full_analysis(rewritten_text)
                     else:
-                        if i == 0: analysis_type = "Original Text"
                         original_content = record.get("original_content", {})
-                        
-                        text_to_analyze = original_content.get("cleaned_selftext") or original_content.get("cleaned_text", "")
-                        
-                        analysis_results = run_full_analysis(text_to_analyze)
+                        text_to_analyze = original_content.get("cleaned_selftext") or original_content.get("cleaned_text")
+                        if i == 0: analysis_type = "Original Text"
+
+                    analysis_results = run_full_analysis(text_to_analyze) if text_to_analyze else {}
 
                     row = {
                         "corpus_item_id": record.get("corpus_item_id"),

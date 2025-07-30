@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 # Load environment variables from .env file at the module level
 load_dotenv()
 
-BLUESKY_HANDLE = os.getenv("BLUESKY_HANDLE")
-BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD")
+BLUESKY_USERNAME = os.getenv("BLUESKY_USERNAME")
+BLUESKY_PASSWORD = os.getenv("BLUESKY_PASSWORD")
 
 def initialize_bluesky_client():
     """Initializes and returns an authenticated atproto Client for Bluesky.
@@ -24,13 +24,13 @@ def initialize_bluesky_client():
         successful, otherwise None.
     """
 
-    if not all([BLUESKY_HANDLE, BLUESKY_APP_PASSWORD]):
+    if not all([BLUESKY_USERNAME, BLUESKY_PASSWORD]):
         print("ERROR: Bluesky credentials not found in .env file.")
         return None
     
     try:
         client = Client()
-        client.login(BLUESKY_HANDLE, BLUESKY_APP_PASSWORD)
+        client.login(BLUESKY_USERNAME, BLUESKY_PASSWORD)
         print(f"Bluesky client initialized successfully. Authenticated as: {client.me.handle}")
         return client
     except Exception as e:

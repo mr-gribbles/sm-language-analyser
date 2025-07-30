@@ -6,82 +6,91 @@ A modular Python pipeline for sourcing, cleaning, rewriting, and analyzing text 
 
 This project provides a comprehensive, end-to-end solution for building high-quality text corpora from social media platforms. It features a robust, modular architecture that separates concerns into distinct components for data sourcing, cleaning, LLM-powered rewriting, and linguistic analysis. The system includes four independent pipelines to collect both original and LLM-rewritten posts from Reddit and Bluesky, ensuring data integrity and variety. A key focus of the project is compliance with platform Terms of Service; it is designed for non-training NLP tasks such as model evaluation, RAG, and linguistic research. The final output is a set of well-structured, clean JSONL files, complete with rich metadata for full traceability, and a separate analysis pipeline to evaluate the linguistic characteristics of the generated corpora.
 
-## Getting Started
+## Usage Workflow
 
-### Dependencies
+This guide will walk you through the entire process of setting up the project, collecting data, and analyzing it.
 
-* **Python 3.11+**
-* All required Python packages are listed in the `requirements.txt` file.
-* The scripts are OS-agnostic but have been tested on macOS and Linux. Windows users may need to adjust path separators if issues arise.
-
-### Installing
+### Step 1: Initial Setup
 
 1.  **Clone the repository** to your local machine:
     ```bash
     git clone https://github.com/mr-gribbles/sm-language-analyser.git
     cd sm-language-analyser
     ```
-2.  **Set up a Python virtual environment** to isolate dependencies:
+2.  **Set up a Python virtual environment** to isolate dependencies. This is a crucial step to avoid conflicts with other projects.
     ```bash
     python3.11 -m venv .venv
     source .venv/bin/activate
     ```
-3.  **Generate then install all required packages**:
+3.  **Generate and install the required packages.** The `generate_requirements.py` script scans the project for all imported packages and creates a `requirements.txt` file.
     ```bash
-    python generate_requirments.py
+    python scripts/generate_requirements.py
     pip install -r requirements.txt
     ```
 
-### Executing program
+### Step 2: Configuration
 
-1.  **Run the interactive setup script** to create your `.env` file with the necessary API keys. The script will prompt you for each required credential.
+1.  **Create a `.env` file.** This file will store your API keys and other configuration settings. You can create it by copying the example file:
     ```bash
-    python setup_env.py
+    cp .env.example .env
     ```
-     #### Where to Find Your API Keys
-    * **Reddit Client ID & Secret:** Log in to Reddit, then create a new "script" application at [**reddit.com/prefs/apps**](https://www.reddit.com/prefs/apps).
-    * **Google Gemini API Key:** Go to [**Google AI Studio**](https://aistudio.google.com/app/apikey) and click "Create API key".
-    * **Bluesky App Password:** In the Bluesky app, go to Settings > Advanced > App Passwords to generate a new password. **Do not use your main account password.**
+2.  **Edit the `.env` file** and add your credentials.
+    *   **`REDDIT_CLIENT_ID` & `REDDIT_CLIENT_SECRET`:** Create a new "script" application at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps).
+    *   **`GEMINI_API_KEY`:** Go to [Google AI Studio](https://aistudio.google.com/app/apikey) and click "Create API key".
+    *   **`BLUESKY_USERNAME` & `BLUESKY_PASSWORD`:** In the Bluesky app, go to Settings > Advanced > App Passwords to generate a new password. **Do not use your main account password.**
 
-2.  **Choose a pipeline to run.** Based on the data you want to collect, run one of the following main scripts from your terminal:
+### Step 3: Data Collection
 
-    * To collect **original, untouched posts from Reddit**:
-        ```bash
-        python main_reddit_unedited.py
-        ```
-    * To collect and **rewrite posts from Reddit** using the LLM:
-        ```bash
-        python main_reddit_rewriter.py
-        ```
-    * To collect **original, untouched posts from Bluesky**:
-        ```bash
-        python main_bluesky_unedited.py
-        ```
-    * To collect and **rewrite posts from Bluesky** using the LLM:
-        ```bash
-        python main_bluesky_rewriter.py
-        ```
-3.  **Analyze a generated corpus file.** Once a `.jsonl` file has been created, you can run the analysis pipeline on it:
-    * To analyse an **original** corpus file:
-        ```bash
-        python analyze_corpus.py corpora/original_only/corpus_file.jsonl
-        ```
-    * To analyse a **rewritten** corpus file:
-        ```bash
-        python analyze_corpus.py corpora/rewritten_pairs/corpus_file.jsonl
-        ```
-    Replace `corpus_file.jsonl` with the name of a generated corpus file.
-    
-4.  **Combine Corpus Files (Optional).** After running the collection pipelines multiple times, you can combine the smaller `.jsonl` files into a single, larger file for easier analysis. This script will also delete the original files after a successful merge.
+Run the main pipeline using `main.py`, specifying the platform (`reddit` or `bluesky`) and whether you want to rewrite the posts.
 
-    * To combine all **original** corpus files:
-        ```bash
-        python combine_corpora.py corpora/original_only
-        ```
-    * To combine all **rewritten** corpus files:
-        ```bash
-        python combine_corpora.py corpora/rewritten_pairs
-        ```
+*   **Collect original posts from Reddit:**
+    ```bash
+    python main.py reddit
+    ```
+*   **Collect and rewrite posts from Reddit:**
+    ```bash
+    python main.py reddit --rewrite
+    ```
+*   **Collect original posts from Bluesky:**
+    ```bash
+    python main.py bluesky
+    ```
+*   **Collect and rewrite posts from Bluesky:**
+    ```bash
+    python main.py bluesky --rewrite
+    ```
+Collected data will be saved as `.jsonl` files in the `corpora/original_only` or `corpora/rewritten_pairs` directories.
+
+### Step 4: Corpus Analysis
+
+Once you have generated a corpus file, you can analyze its linguistic features using the `analyze_corpus.py` script.
+
+*   **Analyze a corpus file:**
+    ```bash
+    python scripts/analyze_corpus.py corpora/original_only/your_file.jsonl
+    ```
+    Replace `your_file.jsonl` with the name of the file you want to analyze. The script will generate a `_analysis.csv` file with the results.
+
+### Step 5: Combining Corpora (Optional)
+
+If you have multiple `.jsonl` files, you can merge them into a single file for easier analysis.
+
+*   **Combine all original corpus files:**
+    ```bash
+    python scripts/combine_corpora.py corpora/original_only
+    ```
+*   **To also delete the original files after merging, add the `--delete-originals` flag:**
+    ```bash
+    python scripts/combine_corpora.py corpora/original_only --delete-originals
+    ```
+
+## Running Tests
+
+This project uses `pytest` for unit testing. To run the tests, simply run the following command from the root directory:
+
+```bash
+pytest
+```
 
 ## Help
 
@@ -117,5 +126,3 @@ A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` er
 ## License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
-
-
