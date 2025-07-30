@@ -74,7 +74,14 @@ def analyze_corpus_file(filepath: str):
         summary = numeric_df.mean().round(3)
         print(summary.to_string())
         
-        output_csv_path = filepath.replace('.jsonl', '_analysis.csv')
+        # Create the analysis_results directory if it doesn't exist
+        output_dir = 'analysis_results'
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create a clean filename and save the CSV in the new directory
+        base_filename = os.path.basename(filepath).replace('.jsonl', '_analysis.csv')
+        output_csv_path = os.path.join(output_dir, base_filename)
+        
         df.to_csv(output_csv_path, index=False)
         print(f"\nDetailed analysis saved to: {output_csv_path}")
 

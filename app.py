@@ -42,9 +42,9 @@ def corpus_management():
 
 @app.route('/api/corpus_files')
 def get_corpus_files():
-    """Returns a list of all .jsonl and .csv files in the corpora directory."""
-    original_files = glob.glob('corpora/original_only/*.jsonl') + glob.glob('corpora/original_only/*.csv')
-    rewritten_files = glob.glob('corpora/rewritten_pairs/*.jsonl') + glob.glob('corpora/rewritten_pairs/*.csv')
+    """Returns a list of all .jsonl files in the corpora directory."""
+    original_files = glob.glob('corpora/original_only/*.jsonl')
+    rewritten_files = glob.glob('corpora/rewritten_pairs/*.jsonl')
     return jsonify({
         'original': [os.path.basename(f) for f in original_files],
         'rewritten': [os.path.basename(f) for f in rewritten_files]
@@ -90,7 +90,9 @@ def run_script_with_logging(target_func, *args):
         target_func(*args)
         logs.append("--- SCRIPT FINISHED ---")
     except Exception as e:
-        logs.append(f"--- SCRIPT FAILED: {e} ---")
+        import traceback
+        error_details = traceback.format_exc()
+        logs.append(f"--- SCRIPT FAILED: {e}\n{error_details} ---")
     finally:
         sys.stdout = original_stdout
 
