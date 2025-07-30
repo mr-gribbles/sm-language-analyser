@@ -38,7 +38,10 @@ def clean_text(raw_text: str) -> str:
     # 3. Remove invisible characters
     text = text.replace('\u200d', '').replace('\u200b', '')
 
-    # 4. Remove emojis and other pictographic symbols
+    # 4. Remove URLs
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+
+    # 5. Remove emojis and other pictographic symbols
     emoji_pattern = re.compile(
         "["
         u"\U0001F600-\U0001F64F" u"\U0001F300-\U0001F5FF" u"\U0001F680-\U0001F6FF"
@@ -48,11 +51,14 @@ def clean_text(raw_text: str) -> str:
         flags=re.UNICODE,
     )
     text = emoji_pattern.sub(r'', text)
+
+    # 6. Remove special characters, keeping only alphanumeric and basic punctuation
+    text = re.sub(r'[^\w\s\'\.\?,!:]', '', text)
     
-    # 5. Normalize whitespace
+    # 7. Normalize whitespace
     text = re.sub(r'\s+', ' ', text).strip()
     
-    # 6. Convert to lowercase
+    # 8. Convert to lowercase
     text = text.lower()
     
     return text
