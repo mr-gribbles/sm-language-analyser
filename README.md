@@ -1,10 +1,8 @@
-# Social Media Language Analyser
+# Social Media Language Analyser (v2.0 - Refactored CLI)
+
+> **Branch Overview:** This branch contains the modern, command-line version of the application. It is the primary development branch for core features. For the legacy version, see the `legacy/v1.0` branch. For the web interface, see the `feature/web-gui` branch.
 
 A modular Python pipeline for sourcing, cleaning, rewriting, and analyzing text data from Reddit and Bluesky to create structured corpora for NLP research.
-
-## Description
-
-This project provides a comprehensive, end-to-end solution for building high-quality text corpora from social media platforms. It features a robust, modular architecture that separates concerns into distinct components for data sourcing, cleaning, LLM-powered rewriting, and linguistic analysis. The system includes four independent pipelines to collect both original and LLM-rewritten posts from Reddit and Bluesky, ensuring data integrity and variety. A key focus of the project is compliance with platform Terms of Service; it is designed for non-training NLP tasks such as model evaluation, RAG, and linguistic research. The final output is a set of well-structured, clean JSONL files, complete with rich metadata for full traceability, and a separate analysis pipeline to evaluate the linguistic characteristics of the generated corpora.
 
 ## Usage Workflow
 
@@ -12,9 +10,9 @@ This guide will walk you through the entire process of setting up the project, c
 
 ### Step 1: Initial Setup
 
-1.  **Clone the repository** to your local machine:
+1.  **Clone this specific branch** to your local machine:
     ```bash
-    git clone https://github.com/mr-gribbles/sm-language-analyser.git
+    git clone https://github.com/mr-gribbles/sm-language-analyser.git --branch v2.0-refactor
     cd sm-language-analyser
     ```
 2.  **Set up a Python virtual environment** to isolate dependencies. This is a crucial step to avoid conflicts with other projects.
