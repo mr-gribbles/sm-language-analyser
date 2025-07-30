@@ -120,15 +120,15 @@ A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` er
     * **Standardized Naming:** Refactored function and variable names for clarity and consistency.
     * **Added Unit Tests:** Integrated `pytest` and added an initial test suite for core logic.
     * **Improved Directory Structure:** Created a `scripts` directory for utility scripts and a `tests` directory for all tests.
-* **0.3**
+* **1.3**
     * Added linguistic analysis pipeline (`analyze_corpus.py`).
     * Added Bluesky scraping and rewriting capabilities.
     * Restructured project into a modular `src` directory.
-* **0.2**
+* **1.2**
     * Implemented modular Reddit pipelines for original and rewritten corpora.
     * Added `config.py` for centralized settings.
     * Integrated Google Gemini for LLM rewriting tasks.
-* **0.1**
+* **1.1**
     * Initial Release: Basic Reddit scraping and PRAW setup.
 
 ## License
