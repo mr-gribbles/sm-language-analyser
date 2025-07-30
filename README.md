@@ -18,9 +18,9 @@ This project provides a comprehensive, end-to-end solution for building high-qua
 
 ### Installing
 
-1.  **Clone the repository** to your local machine:
+1.  **Clone this specific branch** to your local machine:
     ```bash
-    git clone https://github.com/mr-gribbles/sm-language-analyser.git
+    git clone https://github.com/mr-gribbles/sm-language-analyser.git --branch legacy/v1.0
     cd sm-language-analyser
     ```
 2.  **Set up a Python virtual environment** to isolate dependencies:
