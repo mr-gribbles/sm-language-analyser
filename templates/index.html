@@ -29,6 +29,16 @@
         </select>
         <input type="checkbox" name="rewrite" id="rewrite">
         <label for="rewrite">Rewrite Posts</label>
+        <br><br>
+        <label for="num_posts">Number of Posts to Collect:</label>
+        <input type="number" name="num_posts" id="num_posts" value="100" min="1">
+        <br><br>
+        <label for="reddit_limit">Reddit Sample Limit:</label>
+        <input type="number" name="reddit_limit" id="reddit_limit" value="300" min="1" max="1000">
+        <br><br>
+        <label for="bluesky_limit">Bluesky Sample Limit:</label>
+        <input type="number" name="bluesky_limit" id="bluesky_limit" value="100" min="1" max="100">
+        <br><br>
         <button type="submit">Run Pipeline</button>
     </form>
 

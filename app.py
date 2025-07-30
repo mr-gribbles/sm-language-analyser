@@ -55,12 +55,15 @@ def run():
     """Runs the data collection pipeline."""
     platform = request.form.get('platform')
     rewrite = 'rewrite' in request.form
+    num_posts = int(request.form.get('num_posts', 100))
+    reddit_limit = int(request.form.get('reddit_limit', 300))
+    bluesky_limit = int(request.form.get('bluesky_limit', 100))
     
     # Clear previous logs
     logs.clear()
 
     # Run the pipeline in a separate thread to avoid blocking the web server
-    thread = Thread(target=run_pipeline_with_logging, args=(platform, rewrite))
+    thread = Thread(target=run_pipeline_with_logging, args=(platform, rewrite, num_posts, reddit_limit, bluesky_limit))
     thread.start()
     
     return "Pipeline started! Check the logs for progress.", 200
@@ -96,8 +99,8 @@ def run_script_with_logging(target_func, *args):
     finally:
         sys.stdout = original_stdout
 
-def run_pipeline_with_logging(platform, rewrite):
-    run_script_with_logging(run_pipeline, platform, rewrite)
+def run_pipeline_with_logging(platform, rewrite, num_posts, reddit_limit, bluesky_limit):
+    run_script_with_logging(run_pipeline, platform, rewrite, num_posts, reddit_limit, bluesky_limit)
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
