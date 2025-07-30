@@ -84,6 +84,15 @@ If you have multiple `.jsonl` files, you can merge them into a single file for e
     python scripts/combine_corpora.py corpora/original_only --delete-originals
     ```
 
+### Step 6: Advanced Analysis
+
+The `conc_analysis.py` script performs a keyness analysis to compare the original and rewritten corpora. The required spaCy model (`en_core_web_sm`) will be downloaded automatically the first time you run the script.
+
+*   **Run the advanced analysis:**
+    ```bash
+    python scripts/conc_analysis.py corpora/original_only/your_file.jsonl corpora/rewritten_pairs/your_rewritten_file.jsonl
+    ```
+
 ## Running Tests
 
 This project uses `pytest` for unit testing. To run the tests, simply run the following command from the root directory:
@@ -112,6 +121,12 @@ A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` er
 
 ## Version History
 
+* **2.1**
+    * **Added Web Interface:** Created a Flask-based web GUI for running the pipeline and managing corpora.
+    * **Dockerized Application:** Added a `Dockerfile` and `docker-compose.yml` to containerize the application for easy deployment.
+    * **Integrated Analysis Tools:** The web interface now includes controls for running the `analyze`, `combine`, and `concordance` analysis scripts.
+    * **Real-Time Logging:** Implemented real-time log streaming to the web interface for all pipeline and analysis operations.
+    * **Automated SpaCy Model Download:** The `conc_analysis.py` script and the Docker image now automatically download the required spaCy model.
 * **2.0**
     * **Complete Codebase Refactor:** Overhauled the project structure for modularity and maintainability.
     * **Unified Pipeline:** Replaced four separate main scripts with a single `main.py` entry point using command-line arguments.
@@ -120,15 +135,15 @@ A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` er
     * **Standardized Naming:** Refactored function and variable names for clarity and consistency.
     * **Added Unit Tests:** Integrated `pytest` and added an initial test suite for core logic.
     * **Improved Directory Structure:** Created a `scripts` directory for utility scripts and a `tests` directory for all tests.
-* **1.3**
+* **0.3**
     * Added linguistic analysis pipeline (`analyze_corpus.py`).
     * Added Bluesky scraping and rewriting capabilities.
     * Restructured project into a modular `src` directory.
-* **1.2**
+* **0.2**
     * Implemented modular Reddit pipelines for original and rewritten corpora.
     * Added `config.py` for centralized settings.
     * Integrated Google Gemini for LLM rewriting tasks.
-* **1.1**
+* **0.1**
     * Initial Release: Basic Reddit scraping and PRAW setup.
 
 ## License
