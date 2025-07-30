@@ -29,8 +29,9 @@ packages = {
         "conc==0.1.2"            # For advanced corpus analysis
     ],
     "# --- Utilities ---": [
-        "python-dotenv==1.1.1"    # For managing API keys and environment variables securely
+        "python-dotenv==1.1.1",    # For managing API keys and environment variables securely
         "pytest==8.4.0",         # For testing the codebase
+        "flask==3.1.1"          # For the web interface
     ]
 }
 

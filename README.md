@@ -84,6 +84,27 @@ If you have multiple `.jsonl` files, you can merge them into a single file for e
     python scripts/combine_corpora.py corpora/original_only --delete-originals
     ```
 
+### Step 6: Advanced Analysis
+
+The `conc_analysis.py` script performs a keyness analysis to compare the original and rewritten corpora. The required spaCy model (`en_core_web_sm`) will be downloaded automatically the first time you run the script.
+
+*   **Run the advanced analysis:**
+    ```bash
+    python scripts/conc_analysis.py corpora/original_only/your_file.jsonl corpora/rewritten_pairs/your_rewritten_file.jsonl
+    ```
+
+## Web Interface (Docker)
+
+This project includes a web-based GUI to run the data collection pipeline. The easiest way to run it is with Docker.
+
+1.  **Build and run the application:**
+    ```bash
+    docker-compose up --build
+    ```
+2.  **Open your browser** and navigate to [http://localhost:5001](http://localhost:5001).
+
+From the web interface, you can select the platform, choose whether to rewrite posts, and see the live logs of the pipeline.
+
 ## Running Tests
 
 This project uses `pytest` for unit testing. To run the tests, simply run the following command from the root directory:

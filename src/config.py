@@ -20,7 +20,7 @@ NUM_POSTS_TO_COLLECT = int(os.getenv("NUM_POSTS_TO_COLLECT", 100))
 # --- API & CLIENT SETTINGS ---
 REDDIT_SAMPLE_LIMIT = int(os.getenv("REDDIT_SAMPLE_LIMIT", 300))
 BLUESKY_SAMPLE_LIMIT = int(os.getenv("BLUESKY_SAMPLE_LIMIT", 100))
-SLEEP_TIMER = float(os.getenv("SLEEP_TIMER", 4.5))
+SLEEP_TIMER = float(os.getenv("SLEEP_TIMER", 1.5))
 
 # --- LLM REWRITER SETTINGS ---
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-1.5-flash")

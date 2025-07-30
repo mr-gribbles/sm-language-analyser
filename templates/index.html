@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Language Analyser</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .log-container {
+            border: 1px solid #ccc;
+            padding: 1em;
+            height: 400px;
+            overflow-y: scroll;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Social Media Language Analyser</h1>
+    <nav>
+        <a href="/">Pipeline Runner</a> |
+        <a href="/corpus">Corpus Management</a>
+    </nav>
+    <form id="run-form">
+        <label for="platform">Platform:</label>
+        <select name="platform" id="platform">
+            <option value="reddit">Reddit</option>
+            <option value="bluesky">Bluesky</option>
+        </select>
+        <input type="checkbox" name="rewrite" id="rewrite">
+        <label for="rewrite">Rewrite Posts</label>
+        <button type="submit">Run Pipeline</button>
+    </form>
+
+    <h2>Logs</h2>
+    <div class="log-container" id="logs"></div>
+
+    <script>
+        const form = document.getElementById('run-form');
+        const logsContainer = document.getElementById('logs');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            logsContainer.innerHTML = ''; // Clear previous logs
+            const formData = new FormData(form);
+            
+            await fetch('/run', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const eventSource = new EventSource('/logs');
+            eventSource.onmessage = (event) => {
+                const logLine = document.createElement('div');
+                logLine.textContent = event.data;
+                logsContainer.appendChild(logLine);
+                logsContainer.scrollTop = logsContainer.scrollHeight; // Auto-scroll
+            };
+        });
+    </script>
+</body>
+</html>

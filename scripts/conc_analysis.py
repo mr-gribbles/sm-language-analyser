@@ -10,10 +10,25 @@ import argparse
 import os
 import tempfile
 import shutil
+import spacy
+from spacy.cli import download as spacy_download
 from conc.corpus import Corpus
 from conc.conc import Conc
 from conc.core import get_stop_words
 from conc.keyness import Keyness
+
+def ensure_spacy_model_installed(model="en_core_web_sm"):
+    """Checks if a spaCy model is installed and downloads it if not."""
+    try:
+        spacy.load(model)
+        print(f"spaCy model '{model}' already installed.")
+    except OSError:
+        print(f"spaCy model '{model}' not found. Downloading...")
+        spacy_download(model)
+        print(f"'{model}' downloaded successfully.")
+
+# Ensure the required spaCy model is installed before proceeding
+ensure_spacy_model_installed()
 
 save_path = f'corpora/'
 stop_words = get_stop_words(save_path = save_path)
@@ -94,6 +109,10 @@ def main(original_corpus_path: str, rewritten_corpus_path: str):
     # 4. Display the results
     print("\n--- Top 20 Keywords for Rewritten Corpus (vs. Original) ---")
     keyness.keywords(show_document_frequency = True, statistical_significance_cut = 0.0001, apply_bonferroni = True, order_descending = True, min_frequency_reference = 1, page_current = 1).display()
+def run_conc_analysis(original_corpus_path: str, rewritten_corpus_path: str):
+    """A wrapper function to run the main conc analysis logic."""
+    main(original_corpus_path, rewritten_corpus_path)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Perform advanced analysis on two corpora using the 'conc' package.")
     parser.add_argument("original_corpus", type=str, help="Path to the original (unedited) .jsonl corpus file.")
@@ -101,4 +120,4 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    main(args.original_corpus, args.rewritten_corpus)
+    run_conc_analysis(args.original_corpus, args.rewritten_corpus)

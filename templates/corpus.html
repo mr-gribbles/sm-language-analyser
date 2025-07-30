@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corpus Management</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        .log-container {
+            border: 1px solid #ccc;
+            padding: 1em;
+            height: 400px;
+            overflow-y: scroll;
+            background-color: #f9f9f9;
+        }
+        .corpus-section {
+            display: flex;
+            gap: 2em;
+        }
+        .file-list {
+            border: 1px solid #eee;
+            padding: 1em;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Corpus Management</h1>
+    <nav>
+        <a href="/">Pipeline Runner</a> |
+        <a href="/corpus">Corpus Management</a>
+    </nav>
+
+    <div class="corpus-section">
+        <div class="file-list" id="original-files">
+            <h3>Original Corpora</h3>
+            <ul id="original-list"></ul>
+        </div>
+        <div class="file-list" id="rewritten-files">
+            <h3>Rewritten Corpora</h3>
+            <ul id="rewritten-list"></ul>
+        </div>
+    </div>
+
+    <h2>Actions</h2>
+    <form id="analyze-form">
+        <h3>Analyze Corpus File</h3>
+        <input type="text" name="filepath" placeholder="e.g., corpora/original_only/file.jsonl" required>
+        <button type="submit">Analyze</button>
+    </form>
+
+    <form id="combine-form">
+        <h3>Combine Corpora</h3>
+        <select name="directory">
+            <option value="corpora/original_only">Original</option>
+            <option value="corpora/rewritten_pairs">Rewritten</option>
+        </select>
+        <input type="checkbox" name="delete_originals"> Delete Originals
+        <button type="submit">Combine</button>
+    </form>
+
+    <form id="conc-analyze-form">
+        <h3>Concordance Analysis</h3>
+        <input type="text" name="original_corpus" placeholder="Original corpus file" required>
+        <input type="text" name="rewritten_corpus" placeholder="Rewritten corpus file" required>
+        <button type="submit">Run Analysis</button>
+    </form>
+
+    <h2>Logs</h2>
+    <div class="log-container" id="logs"></div>
+
+    <script>
+        const logsContainer = document.getElementById('logs');
+
+        async function fetchFiles() {
+            const response = await fetch('/api/corpus_files');
+            const data = await response.json();
+            
+            const originalList = document.getElementById('original-list');
+            originalList.innerHTML = '';
+            data.original.forEach(file => {
+                const li = document.createElement('li');
+                li.textContent = file;
+                originalList.appendChild(li);
+            });
+
+            const rewrittenList = document.getElementById('rewritten-list');
+            rewrittenList.innerHTML = '';
+            data.rewritten.forEach(file => {
+                const li = document.createElement('li');
+                li.textContent = file;
+                rewrittenList.appendChild(li);
+            });
+        }
+
+        function streamLogs() {
+            const eventSource = new EventSource('/logs');
+            eventSource.onmessage = (event) => {
+                const logLine = document.createElement('div');
+                logLine.textContent = event.data;
+                logsContainer.appendChild(logLine);
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            };
+        }
+
+        document.getElementById('analyze-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            logsContainer.innerHTML = '';
+            const formData = new FormData(e.target);
+            await fetch('/analyze', { method: 'POST', body: formData });
+            streamLogs();
+        });
+
+        document.getElementById('combine-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            logsContainer.innerHTML = '';
+            const formData = new FormData(e.target);
+            await fetch('/combine', { method: 'POST', body: formData });
+            streamLogs();
+        });
+
+        document.getElementById('conc-analyze-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            logsContainer.innerHTML = '';
+            const formData = new FormData(e.target);
+            await fetch('/conc_analyze', { method: 'POST', body: formData });
+            streamLogs();
+        });
+
+        fetchFiles();
+    </script>
+</body>
+</html>

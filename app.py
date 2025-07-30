@@ -1,0 +1,130 @@
+import os
+import sys
+import time
+import glob
+from flask import Flask, render_template, request, Response, jsonify
+from threading import Thread
+
+# Add the project root to the Python path to allow for module imports
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+
+from src.pipeline import run_pipeline
+from scripts.analyze_corpus import analyze_corpus_file
+from scripts.combine_corpora import combine_jsonl_files
+from scripts.conc_analysis import run_conc_analysis
+
+app = Flask(__name__)
+
+# A simple in-memory log store
+logs = []
+
+def stream_logs():
+    """A generator function to stream logs."""
+    # A simple way to stream logs: yield them as they are added
+    # In a real-world app, you might use a more robust queue like Redis
+    last_yielded_index = 0
+    while True:
+        if len(logs) > last_yielded_index:
+            for i in range(last_yielded_index, len(logs)):
+                yield f"data: {logs[i]}\n\n"
+            last_yielded_index = len(logs)
+        time.sleep(0.1) # prevent busy-waiting
+
+@app.route('/')
+def index():
+    """Renders the main page."""
+    return render_template('index.html')
+
+@app.route('/corpus')
+def corpus_management():
+    """Renders the corpus management page."""
+    return render_template('corpus.html')
+
+@app.route('/api/corpus_files')
+def get_corpus_files():
+    """Returns a list of all .jsonl and .csv files in the corpora directory."""
+    original_files = glob.glob('corpora/original_only/*.jsonl') + glob.glob('corpora/original_only/*.csv')
+    rewritten_files = glob.glob('corpora/rewritten_pairs/*.jsonl') + glob.glob('corpora/rewritten_pairs/*.csv')
+    return jsonify({
+        'original': [os.path.basename(f) for f in original_files],
+        'rewritten': [os.path.basename(f) for f in rewritten_files]
+    })
+
+@app.route('/run', methods=['POST'])
+def run():
+    """Runs the data collection pipeline."""
+    platform = request.form.get('platform')
+    rewrite = 'rewrite' in request.form
+    
+    # Clear previous logs
+    logs.clear()
+
+    # Run the pipeline in a separate thread to avoid blocking the web server
+    thread = Thread(target=run_pipeline_with_logging, args=(platform, rewrite))
+    thread.start()
+    
+    return "Pipeline started! Check the logs for progress.", 200
+
+@app.route('/logs')
+def log_stream():
+    """Streams the pipeline logs to the client."""
+    return Response(stream_logs(), mimetype='text/event-stream')
+
+def run_script_with_logging(target_func, *args):
+    """
+    A wrapper to run a function and capture its print statements.
+    """
+    # Redirect stdout to capture logs
+    class LogCatcher:
+        def write(self, message):
+            if message.strip():
+                logs.append(message.strip())
+        
+        def flush(self):
+            pass
+
+    original_stdout = sys.stdout
+    sys.stdout = LogCatcher()
+    
+    try:
+        target_func(*args)
+        logs.append("--- SCRIPT FINISHED ---")
+    except Exception as e:
+        logs.append(f"--- SCRIPT FAILED: {e} ---")
+    finally:
+        sys.stdout = original_stdout
+
+def run_pipeline_with_logging(platform, rewrite):
+    run_script_with_logging(run_pipeline, platform, rewrite)
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    """Runs the corpus analysis script."""
+    filepath = request.form.get('filepath')
+    logs.clear()
+    thread = Thread(target=run_script_with_logging, args=(analyze_corpus_file, filepath))
+    thread.start()
+    return "Analysis started!", 200
+
+@app.route('/combine', methods=['POST'])
+def combine():
+    """Runs the corpus combination script."""
+    directory = request.form.get('directory')
+    delete_originals = 'delete_originals' in request.form
+    logs.clear()
+    thread = Thread(target=run_script_with_logging, args=(combine_jsonl_files, directory, delete_originals))
+    thread.start()
+    return "Combination started!", 200
+
+@app.route('/conc_analyze', methods=['POST'])
+def conc_analyze():
+    """Runs the concordance analysis script."""
+    original_corpus = request.form.get('original_corpus')
+    rewritten_corpus = request.form.get('rewritten_corpus')
+    logs.clear()
+    thread = Thread(target=run_script_with_logging, args=(run_conc_analysis, original_corpus, rewritten_corpus))
+    thread.start()
+    return "Concordance analysis started!", 200
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5001, debug=True)
