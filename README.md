@@ -10,7 +10,7 @@ This project provides a comprehensive, end-to-end solution for building high-qua
 
 ### Dependencies
 
-* **Python 3.9+**
+* **Python 3.11+**
 * All required Python packages are listed in the `requirements.txt` file.
 * The scripts are OS-agnostic but have been tested on macOS and Linux. Windows users may need to adjust path separators if issues arise.
 
@@ -23,7 +23,7 @@ This project provides a comprehensive, end-to-end solution for building high-qua
     ```
 2.  **Set up a Python virtual environment** to isolate dependencies:
     ```bash
-    python3 -m venv .venv
+    python3.11 -m venv .venv
     source .venv/bin/activate
     ```
 3.  **Generate then install all required packages**:
