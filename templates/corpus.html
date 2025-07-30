@@ -45,7 +45,9 @@
     <h2>Actions</h2>
     <form id="analyze-form">
         <h3>Analyze Corpus File</h3>
-        <input type="text" name="filepath" placeholder="e.g., corpora/original_only/file.jsonl" required>
+        <select name="filepath" required>
+            <option value="" disabled selected>Select a file to analyze...</option>
+        </select>
         <button type="submit">Analyze</button>
     </form>
 
@@ -61,8 +63,12 @@
 
     <form id="conc-analyze-form">
         <h3>Concordance Analysis</h3>
-        <input type="text" name="original_corpus" placeholder="Original corpus file" required>
-        <input type="text" name="rewritten_corpus" placeholder="Rewritten corpus file" required>
+        <select name="original_corpus" required>
+            <option value="" disabled selected>Select original corpus...</option>
+        </select>
+        <select name="rewritten_corpus" required>
+            <option value="" disabled selected>Select rewritten corpus...</option>
+        </select>
         <button type="submit">Run Analysis</button>
     </form>
 
@@ -77,19 +83,40 @@
             const data = await response.json();
             
             const originalList = document.getElementById('original-list');
+            const rewrittenList = document.getElementById('rewritten-list');
+            const analyzeSelect = document.querySelector('#analyze-form select');
+            const concOriginalSelect = document.querySelector('#conc-analyze-form select[name=original_corpus]');
+            const concRewrittenSelect = document.querySelector('#conc-analyze-form select[name=rewritten_corpus]');
+
+            // Clear existing content
             originalList.innerHTML = '';
+            rewrittenList.innerHTML = '';
+            analyzeSelect.innerHTML = '<option value="" disabled selected>Select a file to analyze...</option>';
+            concOriginalSelect.innerHTML = '<option value="" disabled selected>Select original corpus...</option>';
+            concRewrittenSelect.innerHTML = '<option value="" disabled selected>Select rewritten corpus...</option>';
+
+            // Populate Original Files
             data.original.forEach(file => {
+                const fullPath = `corpora/original_only/${file}`;
                 const li = document.createElement('li');
                 li.textContent = file;
                 originalList.appendChild(li);
+
+                const option = new Option(file, fullPath);
+                analyzeSelect.add(option.cloneNode(true));
+                concOriginalSelect.add(option.cloneNode(true));
             });
 
-            const rewrittenList = document.getElementById('rewritten-list');
-            rewrittenList.innerHTML = '';
+            // Populate Rewritten Files
             data.rewritten.forEach(file => {
+                const fullPath = `corpora/rewritten_pairs/${file}`;
                 const li = document.createElement('li');
                 li.textContent = file;
                 rewrittenList.appendChild(li);
+
+                const option = new Option(file, fullPath);
+                analyzeSelect.add(option.cloneNode(true));
+                concRewrittenSelect.add(option.cloneNode(true));
             });
         }
 
