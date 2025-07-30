@@ -1,5 +1,7 @@
 # Social Media Language Analyser
 
+> **Note:** This branch contains the Dockerized web interface. For the most up-to-date command-line version and core features, please refer to the `v2.0-refactor` branch. New features will be rolled out to the web app version over time.
+
 A modular Python pipeline for sourcing, cleaning, rewriting, and analyzing text data from Reddit and Bluesky to create structured corpora for NLP research.
 
 ## Description
