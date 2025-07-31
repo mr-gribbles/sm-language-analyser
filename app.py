@@ -81,23 +81,30 @@ def run_script_with_logging(target_func, *args):
     class LogCatcher:
         def write(self, message):
             if message.strip():
-                logs.append(message.strip())
+                # Split multi-line messages and add each line separately
+                lines = message.strip().split('\n')
+                for line in lines:
+                    if line.strip():
+                        logs.append(line.strip())
         
         def flush(self):
             pass
 
     original_stdout = sys.stdout
+    original_stderr = sys.stderr
     sys.stdout = LogCatcher()
+    sys.stderr = LogCatcher()
     
     try:
         target_func(*args)
         logs.append("--- SCRIPT FINISHED ---")
-    except Exception as e:
+    except BaseException as e:
         import traceback
-        error_details = traceback.format_exc()
-        logs.append(f"--- SCRIPT FAILED: {e}\n{error_details} ---")
+        error_details = traceback.format_exc().replace('\n', '<br>')
+        logs.append(f"<div style='color: red;'>--- SCRIPT FAILED: {e}<br>{error_details} ---</div>")
     finally:
         sys.stdout = original_stdout
+        sys.stderr = original_stderr
 
 def run_pipeline_with_logging(platform, rewrite, num_posts, reddit_limit, bluesky_limit):
     run_script_with_logging(run_pipeline, platform, rewrite, num_posts, reddit_limit, bluesky_limit)

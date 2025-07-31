@@ -19,6 +19,7 @@ packages = {
         "beautifulsoup4==4.13.4", # For parsing HTML and cleaning text
         "pandas==2.3.1",          # For data manipulation and analysis
         "numpy==1.23.5"            # For numerical operations, often a dependency for ML libraries
+        "pyarrow==21.0.0"         # For efficient data handling and processing
     ],
     "# --- Machine Learning & NLP (for Evaluation & Analysis) ---": [
         "scikit-learn==1.5.1",    # For classical ML algorithms, metrics, and evaluation tools

@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Download the spaCy model
 RUN python -m spacy download en_core_web_sm
 
+# Download NLTK data
+RUN python -m nltk.downloader vader_lexicon punkt
+
 # Copy the rest of the application's code into the container
 COPY . .
 

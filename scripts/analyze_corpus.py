@@ -87,8 +87,6 @@ def analyze_corpus_file(filepath: str):
 
     except FileNotFoundError:
         print(f"Error: The file '{filepath}' was not found.")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Analyze a text corpus file for linguistic metrics.")

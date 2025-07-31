@@ -14,47 +14,12 @@ if initialization fails.
 
 import textstat
 import nltk
-import ssl
-import sys
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.tokenize import word_tokenize
 
-def initialize_nltk():
-    """
-    Handles downloading of required NLTK data and provides a clear
-    error message if downloads fail due to SSL or other issues.
-    """
-    try:
-        ssl._create_default_https_context = ssl._create_unverified_context
-    except AttributeError:
-        pass  # For systems where this is not needed
-
-    required_resources = ["vader_lexicon", "punkt"]
-    for resource in required_resources:
-        try:
-            nltk.data.find(f"tokenizers/{resource}")
-        except LookupError:
-            nltk.download(resource, quiet=True)
-
-# Run the initialization and catch potential failures.
-try:
-    initialize_nltk()
-    sid = SentimentIntensityAnalyzer()
-except Exception as e:
-    print("="*80)
-    print("ERROR: A critical error occurred while initializing the NLTK analyzer.")
-    print("This is likely because the required NLTK data could not be downloaded.")
-    print(f"The specific error was: {e}")
-    print("\nTo fix this, please try the following steps:")
-    print("1. Run the manual SSL certificate installer for Python (especially on macOS):")
-    print("   - Open Finder -> Applications -> Python 3.11 (or your version)")
-    print("   - Double-click on 'Install Certificates.command'")
-    print("\n2. If that doesn't work, download all required data manually in your terminal:")
-    print("   - Make sure your virtual environment is active.")
-    print("   - Run the command: python -m nltk.downloader vader_lexicon punkt punkt_tab")
-    print("\nAfter running these steps, try the analysis script again.")
-    print("="*80)
-    sys.exit(1) # Exit the script gracefully.
+# Initialize the sentiment analyzer at the module level
+# This assumes the necessary NLTK data has been pre-downloaded.
+sid = SentimentIntensityAnalyzer()
 
 def analyze_readability(text: str) -> dict:
     """Calculates readability scores for a given text.
