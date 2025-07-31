@@ -4,6 +4,7 @@ It filters the posts to return only high-quality text posts, excluding those wit
 The function `fetch_bluesky_timeline_page` fetches a single page of the feed and applies advanced filtering.
 """
 import time
+from atproto import exceptions
 from atproto_client.models.app.bsky.feed.post import Record
 from atproto_client.models.app.bsky.embed.images import Main as EmbedImagesMain
 
@@ -64,8 +65,13 @@ def fetch_bluesky_timeline_page(limit=100, cursor=None):
             
             return high_quality_text_posts, response.cursor
 
-        except Exception as e:
-            # Catching a general exception to handle all network/API errors
+        except exceptions.AtProtocolError as e:
+            if e.response and e.response.status_code == 400:
+                print("Fatal: Received a 400 Bad Request error from Bluesky. This indicates an issue with the request itself (e.g., invalid cursor).")
+                print(f"Error details: {e.response.content}")
+                return [], None  # Stop immediately, no retry
+            
+            # For other network/API errors, proceed with retry logic
             print(f"Warning: An error occurred while fetching from Bluesky. Attempt {attempt + 1}/{max_retries}.")
             print(f"Error details: {e}")
             if attempt + 1 < max_retries:
@@ -75,5 +81,9 @@ def fetch_bluesky_timeline_page(limit=100, cursor=None):
             else:
                 print("Max retries reached. Failed to fetch from Bluesky.")
                 return [], None
+        except Exception as e:
+            # Catch any other unexpected errors
+            print(f"An unexpected error occurred: {e}")
+            return [], None
             
     return [], None
