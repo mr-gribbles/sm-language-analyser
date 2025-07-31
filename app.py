@@ -3,6 +3,7 @@ import sys
 import time
 import glob
 import json
+import datetime
 from flask import Flask, render_template, request, Response, jsonify, flash
 from werkzeug.utils import secure_filename
 from threading import Thread
@@ -171,40 +172,61 @@ def serve_report(filename):
     else:
         return "Report not found", 404
 
-def validate_corpus_file(file_path):
-    """Validates that a file is a properly formatted corpus file from this codebase."""
+def adapt_and_validate_corpus_file(file_path):
+    """
+    Adapts a corpus file to the required internal format and validates it.
+    This function reads the file, adapts each line in memory, and then
+    overwrites the original file with the corrected data.
+    """
+    adapted_records = []
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            # Check first few lines to validate format
-            lines_checked = 0
-            for line in f:
-                if lines_checked >= 3:  # Check first 3 lines
-                    break
-                
+            for i, line in enumerate(f):
+                # Skip empty lines
+                if not line.strip():
+                    continue
+
                 try:
-                    record = json.loads(line.strip())
+                    original_record = json.loads(line)
                     
-                    # Check for required structure from this codebase
-                    required_fields = ['id', 'timestamp', 'platform']
-                    if not all(field in record for field in required_fields):
-                        return False, "Missing required fields (id, timestamp, platform)"
+                    # --- Adaptation Logic ---
+                    adapted_record = {
+                        # Use 'corpus_item_id' as 'id'
+                        'id': original_record.get('corpus_item_id'),
+                        # Add a timestamp, as it's missing
+                        'timestamp': datetime.utcnow().isoformat(),
+                        # Get 'platform' from the nested 'source_details'
+                        'platform': original_record.get('source_details', {}).get('platform'),
+                        # --- Carry over other original fields ---
+                        'version': original_record.get('version'),
+                        'source_details': original_record.get('source_details'),
+                        'original_content': original_record.get('original_content'),
+                        'llm_transformation': original_record.get('llm_transformation')
+                    }
                     
-                    # Check for either original_content or llm_transformation
-                    if 'original_content' not in record and 'llm_transformation' not in record:
-                        return False, "Missing content fields (original_content or llm_transformation)"
-                    
-                    lines_checked += 1
-                    
+                    # --- Validation Logic (on the adapted record) ---
+                    if not all([adapted_record['id'], adapted_record['timestamp'], adapted_record['platform']]):
+                        return False, f"Missing required data in line {i+1}. Could not find id, timestamp, or platform."
+
+                    adapted_records.append(adapted_record)
+
                 except json.JSONDecodeError:
-                    return False, "Invalid JSON format"
-            
-            if lines_checked == 0:
-                return False, "Empty file"
-                
-        return True, "Valid corpus file"
+                    return False, f"Invalid JSON on line {i+1}"
+                except KeyError as e:
+                    return False, f"Missing key {e} in line {i+1}"
         
+        if not adapted_records:
+            return False, "File is empty or contains no valid JSON."
+
+        # If all lines are processed successfully, overwrite the file with adapted data
+        with open(file_path, 'w', encoding='utf-8') as f:
+            for record in adapted_records:
+                f.write(json.dumps(record) + '\n')
+                
+        return True, "File adapted and validated successfully"
+
     except Exception as e:
-        return False, f"Error reading file: {str(e)}"
+        return False, f"Error reading or processing file: {str(e)}"
 
 @app.route('/upload', methods=['POST'])
 def upload_corpus():
@@ -237,8 +259,8 @@ def upload_corpus():
     temp_path = os.path.join(upload_dir, f"temp_{filename}")
     file.save(temp_path)
     
-    # Validate the file
-    is_valid, message = validate_corpus_file(temp_path)
+    # Adapt and validate the file
+    is_valid, message = adapt_and_validate_corpus_file(temp_path)
     
     if not is_valid:
         # Remove invalid file
