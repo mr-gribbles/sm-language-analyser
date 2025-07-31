@@ -174,11 +174,10 @@ def serve_report(filename):
 
 def adapt_and_validate_corpus_file(file_path):
     """
-    Adapts a corpus file to the required internal format and validates it.
-    This function reads the file, adapts each line in memory, and then
-    overwrites the original file with the corrected data.
+    Validates a corpus file and ensures it has the required structure.
+    This function reads the file and validates each line without modifying the data.
     """
-    adapted_records = []
+    record_count = 0
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             for i, line in enumerate(f):
@@ -187,46 +186,33 @@ def adapt_and_validate_corpus_file(file_path):
                     continue
 
                 try:
-                    original_record = json.loads(line)
+                    record = json.loads(line)
                     
-                    # --- Adaptation Logic ---
-                    adapted_record = {
-                        # Use 'corpus_item_id' as 'id'
-                        'id': original_record.get('corpus_item_id'),
-                        # Add a timestamp, as it's missing
-                        'timestamp': datetime.now(timezone.utc).isoformat(),
-                        # Get 'platform' from the nested 'source_details'
-                        'platform': original_record.get('source_details', {}).get('platform'),
-                        # --- Carry over other original fields ---
-                        'version': original_record.get('version'),
-                        'source_details': original_record.get('source_details'),
-                        'original_content': original_record.get('original_content'),
-                        'llm_transformation': original_record.get('llm_transformation')
-                    }
+                    # Basic validation - check for required fields
+                    required_fields = ['corpus_item_id', 'source_details', 'original_content']
+                    missing_fields = [field for field in required_fields if field not in record]
                     
-                    # --- Validation Logic (on the adapted record) ---
-                    if not all([adapted_record['id'], adapted_record['timestamp'], adapted_record['platform']]):
-                        return False, f"Missing required data in line {i+1}. Could not find id, timestamp, or platform."
-
-                    adapted_records.append(adapted_record)
+                    if missing_fields:
+                        return False, f"Missing required fields {missing_fields} in line {i+1}"
+                    
+                    # Check if source_details has platform
+                    if not record.get('source_details', {}).get('platform'):
+                        return False, f"Missing platform in source_details on line {i+1}"
+                    
+                    record_count += 1
 
                 except json.JSONDecodeError:
                     return False, f"Invalid JSON on line {i+1}"
-                except KeyError as e:
-                    return False, f"Missing key {e} in line {i+1}"
+                except Exception as e:
+                    return False, f"Error processing line {i+1}: {str(e)}"
         
-        if not adapted_records:
-            return False, "File is empty or contains no valid JSON."
-
-        # If all lines are processed successfully, overwrite the file with adapted data
-        with open(file_path, 'w', encoding='utf-8') as f:
-            for record in adapted_records:
-                f.write(json.dumps(record) + '\n')
+        if record_count == 0:
+            return False, "File is empty or contains no valid JSON records."
                 
-        return True, "File adapted and validated successfully"
+        return True, f"File validated successfully. Contains {record_count} records."
 
     except Exception as e:
-        return False, f"Error reading or processing file: {str(e)}"
+        return False, f"Error reading file: {str(e)}"
 
 @app.route('/upload', methods=['POST'])
 def upload_corpus():
