@@ -1,0 +1,28 @@
+# Lightweight requirements for Railway deployment
+# This file excludes heavy ML dependencies to reduce build time
+
+# --- Core Social Media API Interaction ---
+praw==7.8.1
+atproto==0.0.61
+
+# --- LLM API Clients ---
+openai==1.97.1
+google-generativeai==0.8.5
+anthropic==0.59.0
+
+# --- Data Cleaning and Handling ---
+beautifulsoup4==4.13.4
+pandas==2.3.1
+numpy==1.23.5
+
+# --- Essential NLP (lightweight) ---
+textstat==0.7.8
+nltk==3.9.1
+
+# --- Utilities ---
+python-dotenv==1.1.1
+flask==3.1.1
+pyarrow==21.0.0
+
+# --- Web Interface Dependencies ---
+gunicorn==21.2.0
