@@ -27,6 +27,7 @@ def get_sentiment_analyzer():
         try:
             nltk.download('vader_lexicon', quiet=True)
             nltk.download('punkt', quiet=True)
+            nltk.download('punkt_tab', quiet=True)
             return SentimentIntensityAnalyzer()
         except Exception as e:
             print(f"Warning: Could not initialize sentiment analyzer: {e}")
@@ -80,6 +81,7 @@ def analyze_lexical_diversity(text: str) -> dict:
         # Download punkt tokenizer if not available
         try:
             nltk.download('punkt', quiet=True)
+            nltk.download('punkt_tab', quiet=True)
             tokens = word_tokenize(text.lower())
             if not tokens:
                 return {"ttr": 0}

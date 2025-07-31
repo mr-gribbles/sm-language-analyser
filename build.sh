@@ -5,7 +5,7 @@ echo "Installing dependencies..."
 pip install -r requirements.txt
 
 echo "Downloading NLTK data..."
-python -c "import nltk; nltk.download('vader_lexicon', quiet=True); nltk.download('punkt', quiet=True)"
+python -c "import nltk; nltk.download('vader_lexicon', quiet=True); nltk.download('punkt', quiet=True); nltk.download('punkt_tab', quiet=True)"
 
 echo "Downloading spaCy model..."
 python -m spacy download en_core_web_sm
