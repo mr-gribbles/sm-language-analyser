@@ -10,10 +10,25 @@ import argparse
 import os
 import tempfile
 import shutil
+import spacy
+from spacy.cli import download as spacy_download
 from conc.corpus import Corpus
 from conc.conc import Conc
 from conc.core import get_stop_words
 from conc.keyness import Keyness
+
+def ensure_spacy_model_installed(model="en_core_web_sm"):
+    """Checks if a spaCy model is installed and downloads it if not."""
+    try:
+        spacy.load(model)
+        print(f"spaCy model '{model}' already installed.")
+    except OSError:
+        print(f"spaCy model '{model}' not found. Downloading...")
+        spacy_download(model)
+        print(f"'{model}' downloaded successfully.")
+
+# Ensure the required spaCy model is installed before proceeding
+ensure_spacy_model_installed()
 
 save_path = f'corpora/'
 stop_words = get_stop_words(save_path = save_path)
@@ -85,15 +100,83 @@ def main(original_corpus_path: str, rewritten_corpus_path: str):
     rewritten_corpus = build_corpus_from_texts('Rewritten', rewritten_texts)
     conc_original = Conc(original_corpus)
     conc_rewritten = Conc(rewritten_corpus)
-    conc_original.frequencies(exclude_punctuation = True, page_current = 1, normalize_by=1000, exclude_tokens = stop_words).display()
-    conc_rewritten.frequencies(exclude_punctuation = True, page_current = 1, normalize_by=1000, exclude_tokens = stop_words).display()
-    # 3. Perform Keyness Analysis
-    print("\nPerforming keyness analysis...")
-    keyness = Keyness(rewritten_corpus, original_corpus)
+    
+    print("\nGenerating frequency analysis...")
+    original_freq_result = conc_original.frequencies(exclude_punctuation=True, page_current=1, normalize_by=1000, exclude_tokens=stop_words)
+    original_freq_df = original_freq_result.to_frame().to_pandas()
 
-    # 4. Display the results
-    print("\n--- Top 20 Keywords for Rewritten Corpus (vs. Original) ---")
-    keyness.keywords(show_document_frequency = True, statistical_significance_cut = 0.0001, apply_bonferroni = True, order_descending = True, min_frequency_reference = 1, page_current = 1).display()
+    rewritten_freq_result = conc_rewritten.frequencies(exclude_punctuation=True, page_current=1, normalize_by=1000, exclude_tokens=stop_words)
+    rewritten_freq_df = rewritten_freq_result.to_frame().to_pandas()
+
+    # 3. Perform Keyness Analysis
+    print("Performing keyness analysis...")
+    keyness = Keyness(rewritten_corpus, original_corpus)
+    keyness_result = keyness.keywords(show_document_frequency=True, statistical_significance_cut=0.0001, apply_bonferroni=True, order_descending=True, min_frequency_reference=1, page_current=1)
+    keyness_df = keyness_result.to_frame().to_pandas()
+
+    # 4. Generate HTML report
+    print("Generating HTML report...")
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Concordance Analysis Report</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; }}
+            h1, h2 {{ color: #333; }}
+            table {{ border-collapse: collapse; width: 100%; margin: 20px 0; }}
+            th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+            th {{ background-color: #f2f2f2; font-weight: bold; }}
+            tr:nth-child(even) {{ background-color: #f9f9f9; }}
+            .section {{ margin: 30px 0; }}
+        </style>
+    </head>
+    <body>
+        <h1>Concordance Analysis Report</h1>
+        
+        <div class="section">
+            <h2>Original Corpus Frequencies</h2>
+            {original_freq_df.to_html(index=False, classes='table')}
+        </div>
+        
+        <div class="section">
+            <h2>Rewritten Corpus Frequencies</h2>
+            {rewritten_freq_df.to_html(index=False, classes='table')}
+        </div>
+        
+        <div class="section">
+            <h2>Keyness Analysis - Top Keywords for Rewritten Corpus (vs. Original)</h2>
+            {keyness_df.to_html(index=False, classes='table')}
+        </div>
+    </body>
+    </html>
+    """
+    
+    # Save HTML report
+    output_dir = 'analysis_results'
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Create filename based on input files
+    original_name = os.path.basename(original_corpus_path).replace('.jsonl', '')
+    rewritten_name = os.path.basename(rewritten_corpus_path).replace('.jsonl', '')
+    html_filename = f"{original_name}_vs_{rewritten_name}_concordance_report.html"
+    html_path = os.path.join(output_dir, html_filename)
+    
+    with open(html_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    print(f"✅ HTML report saved to: {html_path}")
+    print(f"📊 Report contains {len(original_freq_df)} original corpus frequencies")
+    print(f"📊 Report contains {len(rewritten_freq_df)} rewritten corpus frequencies") 
+    print(f"📊 Report contains {len(keyness_df)} keyness analysis results")
+    print("🎉 Concordance analysis completed successfully!")
+    print(f"💡 To view the report, download the file: {html_filename}")
+def run_conc_analysis(original_corpus_path: str, rewritten_corpus_path: str):
+    """A wrapper function to run the main conc analysis logic."""
+    main(original_corpus_path, rewritten_corpus_path)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Perform advanced analysis on two corpora using the 'conc' package.")
     parser.add_argument("original_corpus", type=str, help="Path to the original (unedited) .jsonl corpus file.")
@@ -101,4 +184,4 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    main(args.original_corpus, args.rewritten_corpus)
+    run_conc_analysis(args.original_corpus, args.rewritten_corpus)
