@@ -94,19 +94,31 @@ def _run_bluesky_pipeline(rewrite: bool, output_dir: str, output_filename: str, 
     post_buffer = []
     cursor = None
     empty_fetch_attempts = 0
+    last_cursor = None
     while len(collected_uris) < num_posts_to_collect:
         if not post_buffer:
             new_posts, cursor = fetch_bluesky_timeline_page(limit=sample_limit, cursor=cursor)
+
+            if not new_posts and cursor == last_cursor:
+                empty_fetch_attempts += 1
+                if empty_fetch_attempts >= 3:
+                    print("No new posts found after multiple attempts with the same cursor. Stopping.")
+                    break
+            elif new_posts:
+                empty_fetch_attempts = 0
+
+            last_cursor = cursor
+
             if not new_posts and cursor is None:
+                print("Failed to fetch new posts and no cursor returned. Stopping.")
                 break
+            
             unique_new_posts = [p for p in new_posts if p.uri not in collected_uris]
             post_buffer.extend(unique_new_posts)
-        
+
         if not post_buffer:
-            empty_fetch_attempts += 1
-            if empty_fetch_attempts >= 3:
-                break
-            time.sleep(10)
+            print("Post buffer is empty, fetching more...")
+            time.sleep(config.SLEEP_TIMER)
             continue
         
         empty_fetch_attempts = 0

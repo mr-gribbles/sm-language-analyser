@@ -25,17 +25,22 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
         print(f"Error: The directory '{directory}' does not exist.")
         return
 
-    # Use glob to find all files ending with .jsonl in the target directory
-    source_files = glob.glob(os.path.join(directory, '*.jsonl'))
-
-    if not source_files:
-        print(f"No .jsonl files found in '{directory}'. Nothing to combine.")
-        return
     # Prepare the output filename based on the directory name and current timestamp
     dir_name = os.path.basename(os.path.normpath(directory))
     timestamp = datetime.now().strftime("%Y%m%d")
     output_filename = f"combined_{dir_name}_{timestamp}.jsonl"
     output_filepath = os.path.join(directory, output_filename)
+
+    # Use glob to find all files ending with .jsonl in the target directory
+    source_files = glob.glob(os.path.join(directory, '*.jsonl'))
+
+    # Exclude the output file from the list of source files to prevent it from combining with itself
+    if output_filepath in source_files:
+        source_files.remove(output_filepath)
+
+    if not source_files:
+        print(f"No .jsonl files found in '{directory}'. Nothing to combine.")
+        return
 
     print(f"Found {len(source_files)} files to combine in '{directory}'.")
     print(f"Output will be saved to: {output_filepath}")
