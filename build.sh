@@ -1,14 +1,11 @@
 #!/bin/bash
-# Railway build script
+# Exit immediately if a command exits with a non-zero status.
+set -e
 
-echo "Installing dependencies..."
-pip install --upgrade pip setuptools
+# Install Python dependencies
 pip install -r requirements.txt
 
-echo "Downloading NLTK data..."
-python -c "import nltk; nltk.download('vader_lexicon', quiet=True); nltk.download('punkt', quiet=True); nltk.download('punkt_tab', quiet=True)"
-
-echo "Downloading spaCy model..."
-python -m spacy download en_core_web_sm
+# Download NLTK data
+python -m nltk.downloader vader_lexicon punkt
 
 echo "Build completed successfully!"
