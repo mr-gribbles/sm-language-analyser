@@ -31,12 +31,7 @@ This guide will walk you through setting up and running the web interface using 
     pip install -r requirements.txt
     ```
 
-4.  **Install additional dependencies for the web interface:**
-    ```bash
-    pip install pyarrow  # Required for concordance analysis
-    ```
-
-5.  **Download required NLTK data:**
+4.  **Download required NLTK data:**
     ```bash
     python -c "import nltk; nltk.download('vader_lexicon'); nltk.download('punkt')"
     ```
