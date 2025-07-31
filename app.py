@@ -3,7 +3,7 @@ import sys
 import time
 import glob
 import json
-import datetime
+from datetime import datetime, timezone
 from flask import Flask, render_template, request, Response, jsonify, flash
 from werkzeug.utils import secure_filename
 from threading import Thread
@@ -194,7 +194,7 @@ def adapt_and_validate_corpus_file(file_path):
                         # Use 'corpus_item_id' as 'id'
                         'id': original_record.get('corpus_item_id'),
                         # Add a timestamp, as it's missing
-                        'timestamp': datetime.utcnow().isoformat(),
+                        'timestamp': datetime.now(timezone.utc).isoformat(),
                         # Get 'platform' from the nested 'source_details'
                         'platform': original_record.get('source_details', {}).get('platform'),
                         # --- Carry over other original fields ---
