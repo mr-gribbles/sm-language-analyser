@@ -17,8 +17,7 @@ import argparse
 import sys
 import os
 
-if __name__ == "__main__":
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.core_logic.corpus_analyzer import run_full_analysis
 
@@ -87,6 +86,8 @@ def analyze_corpus_file(filepath: str):
 
     except FileNotFoundError:
         print(f"Error: The file '{filepath}' was not found.")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Analyze a text corpus file for linguistic metrics.")

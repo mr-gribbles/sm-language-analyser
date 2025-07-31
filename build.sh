@@ -2,6 +2,7 @@
 # Railway build script
 
 echo "Installing dependencies..."
+pip install --upgrade pip setuptools
 pip install -r requirements.txt
 
 echo "Downloading NLTK data..."
