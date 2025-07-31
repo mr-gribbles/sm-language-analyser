@@ -491,7 +491,34 @@
             e.preventDefault();
             const formData = new FormData(e.target);
             await submitForm('/conc_analyze', formData, 'Concordance analysis started!');
+            
+            // Check for reports after analysis completes
+            setTimeout(checkForReports, 5000);
         });
+
+        async function checkForReports() {
+            try {
+                const response = await fetch('/reports');
+                const data = await response.json();
+                
+                if (data.reports && data.reports.length > 0) {
+                    const latestReport = data.reports[data.reports.length - 1];
+                    const reportLink = document.createElement('div');
+                    reportLink.innerHTML = `
+                        <div style="background: #667eea; color: white; padding: 15px; border-radius: 10px; margin: 10px 0;">
+                            <strong>📊 Concordance Report Ready!</strong><br>
+                            <a href="${latestReport.url}" target="_blank" style="color: white; text-decoration: underline;">
+                                View ${latestReport.name} Report
+                            </a>
+                        </div>
+                    `;
+                    logsContainer.appendChild(reportLink);
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                }
+            } catch (error) {
+                console.error('Error checking for reports:', error);
+            }
+        }
 
         // Initialize
         fetchFiles();

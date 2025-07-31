@@ -138,6 +138,37 @@ def conc_analyze():
     thread.start()
     return "Concordance analysis started!", 200
 
+@app.route('/reports')
+def list_reports():
+    """Lists all available analysis reports."""
+    reports_dir = 'analysis_results'
+    if not os.path.exists(reports_dir):
+        return jsonify({'reports': []})
+    
+    reports = []
+    for filename in os.listdir(reports_dir):
+        if filename.endswith('.html'):
+            reports.append({
+                'filename': filename,
+                'name': filename.replace('_concordance_report.html', '').replace('_', ' vs '),
+                'url': f'/reports/{filename}'
+            })
+    
+    return jsonify({'reports': reports})
+
+@app.route('/reports/<filename>')
+def serve_report(filename):
+    """Serves analysis report files."""
+    reports_dir = 'analysis_results'
+    file_path = os.path.join(reports_dir, filename)
+    
+    if os.path.exists(file_path) and filename.endswith('.html'):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return content, 200, {'Content-Type': 'text/html'}
+    else:
+        return "Report not found", 404
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     app.run(host='0.0.0.0', port=port, debug=False)

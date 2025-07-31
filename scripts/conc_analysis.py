@@ -155,7 +155,6 @@ def main(original_corpus_path: str, rewritten_corpus_path: str):
     """
     
     # Save HTML report
-    import webbrowser
     output_dir = 'analysis_results'
     os.makedirs(output_dir, exist_ok=True)
     
@@ -168,13 +167,12 @@ def main(original_corpus_path: str, rewritten_corpus_path: str):
     with open(html_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
     
-    print(f"HTML report saved to: {html_path}")
-    print("Opening report in browser...")
-    
-    # Open in browser
-    webbrowser.open(f'file://{os.path.abspath(html_path)}')
-    
-    print("Concordance analysis completed successfully!")
+    print(f"✅ HTML report saved to: {html_path}")
+    print(f"📊 Report contains {len(original_freq_df)} original corpus frequencies")
+    print(f"📊 Report contains {len(rewritten_freq_df)} rewritten corpus frequencies") 
+    print(f"📊 Report contains {len(keyness_df)} keyness analysis results")
+    print("🎉 Concordance analysis completed successfully!")
+    print(f"💡 To view the report, download the file: {html_filename}")
 def run_conc_analysis(original_corpus_path: str, rewritten_corpus_path: str):
     """A wrapper function to run the main conc analysis logic."""
     main(original_corpus_path, rewritten_corpus_path)
