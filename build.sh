@@ -5,7 +5,8 @@ set -e
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Download NLTK data
-python -m nltk.downloader vader_lexicon punkt
+# Create NLTK data directory and download data
+mkdir -p /opt/venv/nltk_data
+python -m nltk.downloader -d /opt/venv/nltk_data vader_lexicon punkt
 
 echo "Build completed successfully!"
