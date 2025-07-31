@@ -8,6 +8,7 @@ It ensures that the output file is named based on the directory and current time
 """
 import os
 import glob
+import json
 import argparse
 from datetime import datetime
 
@@ -25,22 +26,29 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
         print(f"Error: The directory '{directory}' does not exist.")
         return
 
-    # Use glob to find all files ending with .jsonl in the target directory
-    source_files = glob.glob(os.path.join(directory, '*.jsonl'))
-
-    if not source_files:
-        print(f"No .jsonl files found in '{directory}'. Nothing to combine.")
-        return
     # Prepare the output filename based on the directory name and current timestamp
     dir_name = os.path.basename(os.path.normpath(directory))
     timestamp = datetime.now().strftime("%Y%m%d")
     output_filename = f"combined_{dir_name}_{timestamp}.jsonl"
     output_filepath = os.path.join(directory, output_filename)
 
+    # Use glob to find all files ending with .jsonl in the target directory
+    source_files = glob.glob(os.path.join(directory, '*.jsonl'))
+
+    # Exclude the output file from the list of source files to prevent it from combining with itself
+    if output_filepath in source_files:
+        source_files.remove(output_filepath)
+
+    if not source_files:
+        print(f"No .jsonl files found in '{directory}'. Nothing to combine.")
+        return
+
     print(f"Found {len(source_files)} files to combine in '{directory}'.")
     print(f"Output will be saved to: {output_filepath}")
 
     total_lines = 0
+    seen_post_ids = set()
+    
     try:
         # Open the single output file in write mode
         with open(output_filepath, 'w', encoding='utf-8') as outfile:
@@ -49,10 +57,17 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
                 print(f"  -> Processing {os.path.basename(filename)}...")
                 with open(filename, 'r', encoding='utf-8') as infile:
                     for line in infile:
-                        # Write each line from the source file to the output file
-                        outfile.write(line)
-                        total_lines += 1
-        
+                        try:
+                            post = json.loads(line)
+                            post_id = post.get('id')
+
+                            if post_id and post_id not in seen_post_ids:
+                                outfile.write(line)
+                                seen_post_ids.add(post_id)
+                                total_lines += 1
+                        except json.JSONDecodeError:
+                            print(f"Warning: Could not decode JSON from line in {filename}: {line.strip()}")
+
         print("\n--- Combination Complete ---")
         print(f"Successfully combined {len(source_files)} files into '{output_filename}'.")
         print(f"The combined file contains {total_lines} records.")
