@@ -2,7 +2,9 @@ import os
 import sys
 import time
 import glob
-from flask import Flask, render_template, request, Response, jsonify
+import json
+from flask import Flask, render_template, request, Response, jsonify, flash
+from werkzeug.utils import secure_filename
 from threading import Thread
 
 # Add the project root to the Python path to allow for module imports
@@ -168,6 +170,97 @@ def serve_report(filename):
         return content, 200, {'Content-Type': 'text/html'}
     else:
         return "Report not found", 404
+
+def validate_corpus_file(file_path):
+    """Validates that a file is a properly formatted corpus file from this codebase."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            # Check first few lines to validate format
+            lines_checked = 0
+            for line in f:
+                if lines_checked >= 3:  # Check first 3 lines
+                    break
+                
+                try:
+                    record = json.loads(line.strip())
+                    
+                    # Check for required structure from this codebase
+                    required_fields = ['id', 'timestamp', 'platform']
+                    if not all(field in record for field in required_fields):
+                        return False, "Missing required fields (id, timestamp, platform)"
+                    
+                    # Check for either original_content or llm_transformation
+                    if 'original_content' not in record and 'llm_transformation' not in record:
+                        return False, "Missing content fields (original_content or llm_transformation)"
+                    
+                    lines_checked += 1
+                    
+                except json.JSONDecodeError:
+                    return False, "Invalid JSON format"
+            
+            if lines_checked == 0:
+                return False, "Empty file"
+                
+        return True, "Valid corpus file"
+        
+    except Exception as e:
+        return False, f"Error reading file: {str(e)}"
+
+@app.route('/upload', methods=['POST'])
+def upload_corpus():
+    """Handles corpus file uploads."""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': 'No file selected'}), 400
+    
+    file = request.files['file']
+    corpus_type = request.form.get('corpus_type', 'original')
+    
+    if file.filename == '':
+        return jsonify({'success': False, 'message': 'No file selected'}), 400
+    
+    if not file.filename.endswith('.jsonl'):
+        return jsonify({'success': False, 'message': 'Only .jsonl files are allowed'}), 400
+    
+    # Secure the filename
+    filename = secure_filename(file.filename)
+    
+    # Determine upload directory
+    if corpus_type == 'rewritten':
+        upload_dir = 'corpora/rewritten_pairs'
+    else:
+        upload_dir = 'corpora/original_only'
+    
+    # Create directory if it doesn't exist
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Save file temporarily for validation
+    temp_path = os.path.join(upload_dir, f"temp_{filename}")
+    file.save(temp_path)
+    
+    # Validate the file
+    is_valid, message = validate_corpus_file(temp_path)
+    
+    if not is_valid:
+        # Remove invalid file
+        os.remove(temp_path)
+        return jsonify({'success': False, 'message': f'Invalid corpus file: {message}'}), 400
+    
+    # Move to final location
+    final_path = os.path.join(upload_dir, filename)
+    
+    # Check if file already exists
+    if os.path.exists(final_path):
+        os.remove(temp_path)
+        return jsonify({'success': False, 'message': 'File already exists'}), 400
+    
+    os.rename(temp_path, final_path)
+    
+    return jsonify({
+        'success': True, 
+        'message': f'Corpus file uploaded successfully to {corpus_type} collection',
+        'filename': filename,
+        'path': final_path
+    })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
