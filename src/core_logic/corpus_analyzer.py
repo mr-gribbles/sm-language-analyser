@@ -16,10 +16,47 @@ import textstat
 import nltk
 import ssl
 import sys
+import os
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.tokenize import word_tokenize
 
-sid = SentimentIntensityAnalyzer()
+# Global variable to hold the sentiment analyzer
+sid = None
+
+def initialize_nltk():
+    """Initialize NLTK with proper data path configuration."""
+    global sid
+    
+    if sid is not None:
+        return  # Already initialized
+    
+    # Add common NLTK data paths for containerized environments
+    nltk_data_paths = [
+        '/opt/venv/nltk_data',
+        '/app/nltk_data',
+        '/root/nltk_data',
+        os.path.expanduser('~/nltk_data')
+    ]
+    
+    for path in nltk_data_paths:
+        if path not in nltk.data.path:
+            nltk.data.path.append(path)
+    
+    try:
+        # Try to initialize the sentiment analyzer
+        sid = SentimentIntensityAnalyzer()
+    except LookupError:
+        # If data is missing, try to download it
+        try:
+            nltk.download('vader_lexicon', quiet=True)
+            nltk.download('punkt', quiet=True)
+            sid = SentimentIntensityAnalyzer()
+        except Exception as e:
+            print(f"Warning: Could not initialize NLTK sentiment analyzer: {e}")
+            sid = None
+
+# Initialize NLTK when module is imported
+initialize_nltk()
 
 def analyze_readability(text: str) -> dict:
     """Calculates readability scores for a given text.
@@ -73,6 +110,15 @@ def analyze_sentiment(text: str) -> dict:
     If the text is empty or not a string, returns None for all scores.
     """
     if not text or not isinstance(text, str):
+        return {
+            "sentiment_positive": None,
+            "sentiment_negative": None,
+            "sentiment_neutral": None,
+            "sentiment_compound": None
+        }
+    
+    # Check if sentiment analyzer is available
+    if sid is None:
         return {
             "sentiment_positive": None,
             "sentiment_negative": None,
