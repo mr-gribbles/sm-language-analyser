@@ -50,6 +50,7 @@ def initialize_nltk():
         try:
             nltk.download('vader_lexicon', quiet=True)
             nltk.download('punkt', quiet=True)
+            nltk.download('punkt_tab', quiet=True)
             sid = SentimentIntensityAnalyzer()
         except Exception as e:
             print(f"Warning: Could not initialize NLTK sentiment analyzer: {e}")
