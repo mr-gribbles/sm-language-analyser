@@ -17,9 +17,23 @@ import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.tokenize import word_tokenize
 
-# Initialize the sentiment analyzer at the module level
-# This assumes the necessary NLTK data has been pre-downloaded.
-sid = SentimentIntensityAnalyzer()
+# Initialize the sentiment analyzer with error handling
+# Download NLTK data if not available
+def get_sentiment_analyzer():
+    try:
+        return SentimentIntensityAnalyzer()
+    except LookupError:
+        # Download required NLTK data if not found
+        try:
+            nltk.download('vader_lexicon', quiet=True)
+            nltk.download('punkt', quiet=True)
+            return SentimentIntensityAnalyzer()
+        except Exception as e:
+            print(f"Warning: Could not initialize sentiment analyzer: {e}")
+            return None
+
+# Initialize the sentiment analyzer
+sid = get_sentiment_analyzer()
 
 def analyze_readability(text: str) -> dict:
     """Calculates readability scores for a given text.
@@ -54,13 +68,36 @@ def analyze_lexical_diversity(text: str) -> dict:
     if not text or not isinstance(text, str):
         return {"ttr": None}
     
-    tokens = word_tokenize(text.lower())
-    if not tokens:
-        return {"ttr": 0}
-        
-    unique_tokens = set(tokens)
-    ttr = len(unique_tokens) / len(tokens) if len(tokens) > 0 else 0
-    return {"ttr": ttr}
+    try:
+        tokens = word_tokenize(text.lower())
+        if not tokens:
+            return {"ttr": 0}
+            
+        unique_tokens = set(tokens)
+        ttr = len(unique_tokens) / len(tokens) if len(tokens) > 0 else 0
+        return {"ttr": ttr}
+    except LookupError:
+        # Download punkt tokenizer if not available
+        try:
+            nltk.download('punkt', quiet=True)
+            tokens = word_tokenize(text.lower())
+            if not tokens:
+                return {"ttr": 0}
+            unique_tokens = set(tokens)
+            ttr = len(unique_tokens) / len(tokens) if len(tokens) > 0 else 0
+            return {"ttr": ttr}
+        except Exception as e:
+            print(f"Warning: Lexical diversity analysis failed: {e}")
+            # Fallback to simple word splitting
+            tokens = text.lower().split()
+            if not tokens:
+                return {"ttr": 0}
+            unique_tokens = set(tokens)
+            ttr = len(unique_tokens) / len(tokens) if len(tokens) > 0 else 0
+            return {"ttr": ttr}
+    except Exception as e:
+        print(f"Warning: Lexical diversity analysis failed: {e}")
+        return {"ttr": None}
 
 def analyze_sentiment(text: str) -> dict:
     """Performs VADER sentiment analysis on a text.
@@ -72,7 +109,7 @@ def analyze_sentiment(text: str) -> dict:
     A dictionary containing positive, negative, neutral, and compound sentiment scores.
     If the text is empty or not a string, returns None for all scores.
     """
-    if not text or not isinstance(text, str):
+    if not text or not isinstance(text, str) or sid is None:
         return {
             "sentiment_positive": None,
             "sentiment_negative": None,
@@ -80,13 +117,22 @@ def analyze_sentiment(text: str) -> dict:
             "sentiment_compound": None
         }
     
-    scores = sid.polarity_scores(text)
-    return {
-        "sentiment_positive": scores['pos'],
-        "sentiment_negative": scores['neg'],
-        "sentiment_neutral": scores['neu'],
-        "sentiment_compound": scores['compound']
-    }
+    try:
+        scores = sid.polarity_scores(text)
+        return {
+            "sentiment_positive": scores['pos'],
+            "sentiment_negative": scores['neg'],
+            "sentiment_neutral": scores['neu'],
+            "sentiment_compound": scores['compound']
+        }
+    except Exception as e:
+        print(f"Warning: Sentiment analysis failed: {e}")
+        return {
+            "sentiment_positive": None,
+            "sentiment_negative": None,
+            "sentiment_neutral": None,
+            "sentiment_compound": None
+        }
 def run_full_analysis(text: str) -> dict:
     """Runs all text analyses and combines them into a single dictionary.
     
