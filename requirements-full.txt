@@ -1,5 +1,5 @@
-# Lightweight requirements for Railway deployment
-# This file excludes heavy ML dependencies to reduce build time
+# Full requirements for local development
+# This file contains all dependencies including heavy ML libraries
 
 # --- Core Social Media API Interaction ---
 praw==7.8.1
@@ -15,14 +15,17 @@ beautifulsoup4==4.13.4
 pandas==2.3.1
 numpy==1.23.5
 
-# --- Essential NLP (lightweight) ---
+# --- Machine Learning & NLP (for Evaluation & Analysis) ---
+scikit-learn==1.5.1
+torch==2.4.0
+transformers==4.42.4
 textstat==0.7.8
 nltk==3.9.1
+conc==0.1.2
 
 # --- Utilities ---
 python-dotenv==1.1.1
+pytest==8.4.0
 flask==3.1.1
 pyarrow==21.0.0
-
-# --- Web Interface Dependencies ---
 gunicorn==21.2.0
