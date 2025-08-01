@@ -4,6 +4,8 @@
 
 A modular Python pipeline for sourcing, cleaning, rewriting, and analyzing text data from Reddit and Bluesky to create structured corpora for NLP research.
 
+**Check out my website for a publicly avaliable web client:** [https://sm-language.up.railway.app](https://sm-language.up.railway.app)
+
 ## Usage Workflow
 
 This guide will walk you through the entire process of setting up the project, collecting data, and analyzing it.
