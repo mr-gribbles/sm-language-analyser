@@ -125,30 +125,33 @@ A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` er
 
 ## Version History
 
+
+
+* **2.2**
+    * **Modernized Web Interface:** Complete UI/UX overhaul with modern design, responsive layout, and improved accessibility.
+    * **Removed Docker Dependency:** Simplified deployment by using Python virtual environments instead of Docker containers.
+    * **Enhanced Analysis Tools:** Improved concordance analysis with HTML report generation and automatic browser opening.
+    * **Fixed Text Overflow Issues:** Resolved UI problems with long filenames and improved responsive design.
+    * **Better Error Handling:** Enhanced error messages and troubleshooting guidance.
 * **2.1**
     * **Added Web Interface:** Created a Flask-based web GUI for running the pipeline and managing corpora.
-    * **Dockerized Application:** Added a `Dockerfile` and `docker-compose.yml` to containerize the application for easy deployment.
-    * **Integrated Analysis Tools:** The web interface now includes controls for running the `analyze`, `combine`, and `concordance` analysis scripts.
-    * **Real-Time Logging:** Implemented real-time log streaming to the web interface for all pipeline and analysis operations.
-    * **Automated SpaCy Model Download:** The `conc_analysis.py` script and the Docker image now automatically download the required spaCy model.
+    * **Dockerized Application:** Added containerization for easy deployment (later removed in v2.2).
+    * **Integrated Analysis Tools:** The web interface includes controls for running analysis, combine, and concordance scripts.
+    * **Real-Time Logging:** Implemented real-time log streaming to the web interface.
+    * **Automated SpaCy Model Download:** Scripts now automatically download required models.
 * **2.0**
-    * **Complete Codebase Refactor:** Overhauled the project structure for modularity and maintainability.
-    * **Unified Pipeline:** Replaced four separate main scripts with a single `main.py` entry point using command-line arguments.
-    * **Centralized Logic:** Moved all core data processing logic into a new `src/pipeline.py` module.
-    * **Improved Configuration:** Migrated all settings to a `.env` file, removing hardcoded values.
-    * **Standardized Naming:** Refactored function and variable names for clarity and consistency.
-    * **Added Unit Tests:** Integrated `pytest` and added an initial test suite for core logic.
-    * **Improved Directory Structure:** Created a `scripts` directory for utility scripts and a `tests` directory for all tests.
-* **0.3**
-    * Added linguistic analysis pipeline (`analyze_corpus.py`).
-    * Added Bluesky scraping and rewriting capabilities.
-    * Restructured project into a modular `src` directory.
-* **0.2**
-    * Implemented modular Reddit pipelines for original and rewritten corpora.
-    * Added `config.py` for centralized settings.
-    * Integrated Google Gemini for LLM rewriting tasks.
-* **0.1**
-    * Initial Release: Basic Reddit scraping and PRAW setup.
+    * **Complete Codebase Refactor:** Overhauled project structure for modularity and maintainability.
+    * **Unified Pipeline:** Replaced four separate scripts with a single entry point.
+    * **Centralized Logic:** Moved core processing logic into modular components.
+    * **Improved Configuration:** Migrated all settings to `.env` file.
+    * **Added Unit Tests:** Integrated `pytest` with comprehensive test suite.
+* **1.3**
+    * Added linguistic analysis pipeline and Bluesky integration.
+    * Restructured project into modular `src` directory.
+* **1.2**
+    * Implemented modular Reddit pipelines and Google Gemini integration.
+* **1.1**
+    * Initial Release: Basic Reddit scraping functionality.
 
 ## License
 
