@@ -1,15 +1,12 @@
-"""Initializes and provides a reusable, authenticated Reddit client.
+"""Reddit client initialization and authentication.
 
-This module is responsible for handling the connection and authentication to
-the Reddit API using PRAW (Python Reddit API Wrapper). It reads credentials
-from environment variables, logs in, and creates a single, shared client
-instance that can be imported by other parts of the application, such as the
-scraper module.
-
+This module handles the connection and authentication to the Reddit API using
+PRAW (Python Reddit API Wrapper). It reads credentials from environment
+variables and creates a single, shared client instance that can be imported
+by other parts of the application.
 """
-
-import praw
 import os
+import praw
 from dotenv import load_dotenv
 
 # Load environment variables from .env file at the module level
@@ -19,14 +16,16 @@ CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
 CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
 USER_AGENT = os.getenv("REDDIT_USER_AGENT")
 
+
 def initialize_reddit_client():
-    """
-    Initializes and returns an authenticated PRAW Reddit client.
+    """Initialize and return an authenticated PRAW Reddit client.
+
     This function reads the client ID, client secret, and user agent from
-    the environment variables. It then attempts to log in to the Reddit API.
-    If successful, it returns an authenticated client instance.
+    the environment variables and attempts to create an authenticated
+    Reddit API client.
+
     Returns:
-        praw.Reddit | None: An authenticated PRAW client instance if login is
+        An authenticated PRAW client instance if initialization is
         successful, otherwise None.
     """
     if not all([CLIENT_ID, CLIENT_SECRET, USER_AGENT]):

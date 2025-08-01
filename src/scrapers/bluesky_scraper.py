@@ -1,7 +1,8 @@
-"""This module provides a function to scrape the "What's Hot" feed from Bluesky.
+"""Bluesky scraper for collecting high-quality text posts.
 
-It filters the posts to return only high-quality text posts, excluding those with images or low word counts.
-The function `fetch_bluesky_timeline_page` fetches a single page of the feed and applies advanced filtering.
+This module provides functionality to scrape the "What's Hot" feed from Bluesky,
+filtering posts to return only high-quality text content while excluding posts
+with images or insufficient word counts.
 """
 import time
 from atproto import exceptions
@@ -12,20 +13,21 @@ from atproto_client.models.app.bsky.embed.images import Main as EmbedImagesMain
 from src.clients.bluesky_client import bluesky_client
 
 # Define the unique URI for the "What's Hot" feed.
-WHATS_HOT_FEED_URI = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot"
+WHATS_HOT_FEED_URI = ("at://did:plc:z72i7hdynmk6r22z27h6tvur/"
+                      "app.bsky.feed.generator/whats-hot")
+
 
 def fetch_bluesky_timeline_page(limit=100, cursor=None):
-    """
-    Fetches a single page of the "What's Hot" feed and applies advanced
-    filtering to return only high-quality text posts.
+    """Fetch a single page of the "What's Hot" feed with quality filtering.
 
-    Keyword arguments:
-    limit -- The maximum number of posts to fetch (default is 100).
-    cursor -- Optional; used for pagination to fetch the next page of results.  
+    Args:
+        limit: The maximum number of posts to fetch (default is 100).
+        cursor: Optional cursor for pagination to fetch the next page.
 
     Returns:
-    A list of high-quality text posts that meet the filtering criteria.
-    If no posts are found or an error occurs, returns an empty list and None for the cursor.    
+        tuple: A tuple containing:
+            - List of high-quality text posts that meet filtering criteria
+            - Cursor for next page (None if no more pages or error occurred)
     """
     if not bluesky_client:
         print("Bluesky client is not available.")

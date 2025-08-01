@@ -1,10 +1,11 @@
-"""Generate a requirements.txt file for the Social Media Language Analysis Project
+"""Requirements file generator for the Social Media Language Analysis Project.
 
-This script creates a requirements.txt file with all necessary dependencies for the project.
-It categorizes the packages into sections for better organization and readability.
-It ensures that the file is formatted correctly for use with pip.
-It includes comments to explain the purpose of each section.
+This script creates a requirements.txt file with all necessary dependencies
+for the project. It categorizes the packages into sections for better
+organization and readability, ensures proper formatting for pip, and includes
+comments to explain the purpose of each section.
 """
+
 packages = {
     "# --- Core Social Media API Interaction ---": [
         "praw==7.8.1",  # The Python Reddit API Wrapper for data sourcing
@@ -29,8 +30,8 @@ packages = {
         "conc==0.1.2"            # For advanced corpus analysis
     ],
     "# --- Utilities ---": [
-        "python-dotenv==1.1.1"    # For managing API keys and environment variables securely
-        "pytest==8.4.0",         # For testing the codebase
+        "python-dotenv==1.1.1",   # For managing API keys and environment variables securely
+        "pytest==8.4.0",          # For testing the codebase
     ]
 }
 

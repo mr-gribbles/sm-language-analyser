@@ -1,26 +1,29 @@
-"""Combine multiple .jsonl files into a single file and optionally delete the originals.
+"""Corpus file combination script.
 
-This script searches for all .jsonl files in a specified directory, combines them into a single output file,
-and then deletes the original source files if the user confirms.
-It provides feedback on the number of files processed and the total number of records in the combined file.
-It uses argparse for command-line interface.
-It ensures that the output file is named based on the directory and current timestamp.
+This script searches for all .jsonl files in a specified directory, combines
+them into a single output file, and optionally deletes the original source
+files. It provides feedback on the number of files processed and the total
+number of records in the combined file. The output file is named based on
+the directory and current timestamp.
 """
-import os
+import argparse
 import glob
 import json
-import argparse
+import os
 from datetime import datetime
 
-def combine_jsonl_files(directory: str, delete_originals: bool = False):
-    """Combines all .jsonl files in the specified directory into a single file.
 
-    Keyword arguments:
-    directory -- The path to the directory containing the .jsonl files to combine.
-    delete_originals -- Whether to delete the original source files after combining.
-    
+def combine_jsonl_files(directory: str, delete_originals: bool = False):
+    """Combine all .jsonl files in the specified directory into a single file.
+
+    Args:
+        directory: The path to the directory containing the .jsonl files.
+        delete_originals: Whether to delete the original source files after
+            combining.
+
     Returns:
-    None. The combined results are saved to a new .jsonl file in the same directory
+        None. The combined results are saved to a new .jsonl file in the
+        same directory.
     """
     if not os.path.isdir(directory):
         print(f"Error: The directory '{directory}' does not exist.")

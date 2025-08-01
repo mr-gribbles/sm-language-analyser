@@ -1,13 +1,12 @@
-"""Initializes and provides a reusable, authenticated Bluesky client.
+"""Bluesky client initialization and authentication.
 
-This module is responsible for handling the connection and authentication to
-the Bluesky API using atproto. It reads credentials from environment variables,
-logs in, and creates a single, shared client instance that can be imported by
-other parts of the application, such as the scraper module.
+This module handles the connection and authentication to the Bluesky API using
+atproto. It reads credentials from environment variables, logs in, and creates
+a single, shared client instance that can be imported by other parts of the
+application.
 """
-
 import os
-from atproto import Client, exceptions
+from atproto import Client
 from dotenv import load_dotenv
 
 # Load environment variables from .env file at the module level
@@ -16,12 +15,13 @@ load_dotenv()
 BLUESKY_USERNAME = os.getenv("BLUESKY_USERNAME")
 BLUESKY_PASSWORD = os.getenv("BLUESKY_PASSWORD")
 
+
 def initialize_bluesky_client():
-    """Initializes and returns an authenticated atproto Client for Bluesky.
+    """Initialize and return an authenticated atproto Client for Bluesky.
 
     Returns:
-        atproto.Client | None: An authenticated client instance if login is
-        successful, otherwise None.
+        An authenticated client instance if login is successful,
+        otherwise None.
     """
 
     if not all([BLUESKY_USERNAME, BLUESKY_PASSWORD]):

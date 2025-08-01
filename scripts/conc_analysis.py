@@ -1,24 +1,30 @@
-"""Performs advanced corpus analysis using the 'conc' package.
+"""Advanced corpus analysis using the 'conc' package.
 
 This script loads an original corpus and a rewritten corpus, then performs
 a keyness analysis to identify which words are statistically more frequent
-(i.e., "key") in the rewritten text. It provides a powerful way to
-quantify the stylistic changes introduced by the LLM.
+(i.e., "key") in the rewritten text. It provides a powerful way to quantify
+the stylistic changes introduced by the LLM.
 """
-import json
 import argparse
+import json
 import os
-import tempfile
 import shutil
+import tempfile
+
 import spacy
-from spacy.cli import download as spacy_download
-from conc.corpus import Corpus
 from conc.conc import Conc
 from conc.core import get_stop_words
+from conc.corpus import Corpus
 from conc.keyness import Keyness
+from spacy.cli import download as spacy_download
+
 
 def ensure_spacy_model_installed(model="en_core_web_sm"):
-    """Checks if a spaCy model is installed and downloads it if not."""
+    """Check if a spaCy model is installed and download it if not.
+    
+    Args:
+        model: The name of the spaCy model to check/install.
+    """
     try:
         spacy.load(model)
         print(f"spaCy model '{model}' already installed.")
@@ -34,7 +40,14 @@ save_path = f'corpora/'
 stop_words = get_stop_words(save_path = save_path)
 
 def load_corpus_texts(filepath: str) -> list:
-    """Loads the cleaned text from a .jsonl corpus file into a list."""
+    """Load the cleaned text from a .jsonl corpus file into a list.
+    
+    Args:
+        filepath: Path to the .jsonl corpus file.
+        
+    Returns:
+        List of text strings extracted from the corpus file.
+    """
     texts = []
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -57,7 +70,15 @@ def load_corpus_texts(filepath: str) -> list:
     return texts
 
 def build_corpus_from_texts(name: str, texts: list) -> Corpus:
-    """Builds a conc.Corpus object from a list of strings."""
+    """Build a conc.Corpus object from a list of strings.
+    
+    Args:
+        name: Name for the corpus.
+        texts: List of text strings to include in the corpus.
+        
+    Returns:
+        A conc.Corpus object built from the provided texts.
+    """
     # Create a temporary directory to hold the text files
     temp_dir = tempfile.mkdtemp()
     
@@ -80,7 +101,12 @@ def build_corpus_from_texts(name: str, texts: list) -> Corpus:
     return corpus
 
 def main(original_corpus_path: str, rewritten_corpus_path: str):
-    """Main function to run the advanced analysis pipeline."""
+    """Run the advanced analysis pipeline.
+    
+    Args:
+        original_corpus_path: Path to the original corpus file.
+        rewritten_corpus_path: Path to the rewritten corpus file.
+    """
     print("--- Starting Advanced Corpus Analysis using 'conc' ---")
     
     # 1. Load the text data from your corpus files
@@ -174,7 +200,12 @@ def main(original_corpus_path: str, rewritten_corpus_path: str):
     print("🎉 Concordance analysis completed successfully!")
     print(f"💡 To view the report, download the file: {html_filename}")
 def run_conc_analysis(original_corpus_path: str, rewritten_corpus_path: str):
-    """A wrapper function to run the main conc analysis logic."""
+    """Run the main conc analysis logic.
+    
+    Args:
+        original_corpus_path: Path to the original corpus file.
+        rewritten_corpus_path: Path to the rewritten corpus file.
+    """
     main(original_corpus_path, rewritten_corpus_path)
 
 if __name__ == "__main__":

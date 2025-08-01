@@ -1,24 +1,28 @@
-"""This module provides functions to clean raw text data for further processing.
+"""Text cleaning and preprocessing utilities.
 
-It includes robust cleaning steps such as removing HTML tags, normalizing punctuation,
-stripping invisible characters, removing emojis, normalizing whitespace, and converting
-the text to lowercase. The `clean_text` function is designed to handle various types of
-raw text inputs, ensuring that the output is a clean and standardized string suitable for
+This module provides robust text cleaning functionality including HTML tag removal,
+punctuation normalization, invisible character stripping, emoji removal, whitespace
+normalization, and case conversion. The clean_text function is designed to handle
+various types of raw text inputs and produce standardized output suitable for
 text analysis or storage.
 """
 import re
 from bs4 import BeautifulSoup
 
+
 def clean_text(raw_text: str) -> str:
-    """Performs robust cleaning on raw text data.
-    
-    Keyword arguments:
-    raw_text -- The raw text to be cleaned (should be a string).
+    """Perform robust cleaning on raw text data.
+
+    Args:
+        raw_text: The raw text to be cleaned (must be a string).
 
     Returns:
-    A cleaned version of the text, with HTML tags removed, punctuation normalized,
-    invisible characters stripped, emojis removed, whitespace normalized, and converted to lowercase.
-    If the input is not a string, raises a TypeError.
+        A cleaned version of the text with HTML tags removed, punctuation
+        normalized, invisible characters stripped, emojis removed, whitespace
+        normalized, and converted to lowercase.
+
+    Raises:
+        TypeError: If the input is not a string.
     """
     if not isinstance(raw_text, str):
         # Raise an exception if the input is not a string

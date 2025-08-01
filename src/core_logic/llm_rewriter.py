@@ -1,9 +1,9 @@
-"""This module provides functions to rewrite text using the Gemini API.
+"""Text rewriting using the Gemini API.
 
-It includes robust error handling for blocked prompts and API errors.
-The `rewrite_text_with_gemini` function is designed to take cleaned text and
-rewrite it using a specified Gemini model and prompt template. If the prompt
-is blocked by the Gemini safety filters, it will return None and log a warning.
+This module provides functionality to rewrite text using Google's Gemini API
+with robust error handling for blocked prompts and API errors. The rewrite
+function takes cleaned text and transforms it using a specified Gemini model
+and prompt template.
 """
 import os
 import google.generativeai as genai
@@ -19,21 +19,24 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 else:
-    raise ValueError("Gemini API key not found. Please set GEMINI_API_KEY in your .env file.")
+    raise ValueError(
+        "Gemini API key not found. Please set GEMINI_API_KEY in your .env file."
+    )
+
 
 def rewrite_text_with_gemini(text_to_rewrite, model_name, prompt_template):
-    """
-    Uses the Gemini API to rewrite the provided text, now with robust
-    handling for blocked prompts.
+    """Use the Gemini API to rewrite the provided text.
 
-    Keyword arguments:
-    text_to_rewrite -- The cleaned text that needs to be rewritten.
-    model_name -- The name of the Gemini model to use for rewriting.
-    prompt_template -- The template for the prompt to be used with the model.
+    Includes robust handling for blocked prompts and API errors.
+
+    Args:
+        text_to_rewrite: The cleaned text that needs to be rewritten.
+        model_name: The name of the Gemini model to use for rewriting.
+        prompt_template: The template for the prompt to be used with the model.
 
     Returns:
-    The rewritten text if the prompt is not blocked, otherwise None.
-    If an API error occurs, it will print an error message and return None. 
+        The rewritten text if successful, otherwise None. Returns None if
+        the prompt is blocked by safety filters or if an API error occurs.
     """
     try:
         model = genai.GenerativeModel(model_name)

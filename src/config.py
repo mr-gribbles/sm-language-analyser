@@ -1,3 +1,9 @@
+"""Configuration settings for the Social Media Language Analysis Pipeline.
+
+This module contains all configuration variables and settings used throughout
+the application, including API limits, directory paths, and LLM settings.
+All settings can be overridden using environment variables.
+"""
 import os
 import random
 from dotenv import load_dotenv
@@ -11,7 +17,13 @@ SUBREDDIT_LIST = [
     "LifeProTips", "TwoXChromosomes", "AskScience"
 ]
 
+
 def get_target_subreddit():
+    """Return a randomly selected subreddit from the configured list.
+    
+    Returns:
+        str: A randomly chosen subreddit name from SUBREDDIT_LIST.
+    """
     return random.choice(SUBREDDIT_LIST)
 
 # --- GENERAL PIPELINE SETTINGS ---

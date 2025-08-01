@@ -1,26 +1,29 @@
-"""This module provides a function to scrape Reddit for pure text posts.
+"""Reddit scraper for collecting pure text posts.
 
-It filters out posts that contain images in their body and returns a random post
-from a specified subreddit.
+This module provides functionality to scrape Reddit for high-quality text posts,
+filtering out posts that contain images and returning random posts from
+specified subreddits.
 """
 import random
 from src.clients.reddit_client import reddit_client
 
 IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
 
-def get_random_text_post(subreddit_name, limit=100):
-    """
-    Fetches a random, non-empty, pure text post from a given subreddit,
-    filtering out posts that contain image links in their body.
 
-    Keyword arguments:
-    subreddit_name -- The name of the subreddit to scrape.
-    limit -- The maximum number of posts to fetch from the subreddit (default is 100).
+def get_random_text_post(subreddit_name, limit=100):
+    """Fetch a random, pure text post from a given subreddit.
+
+    Filters out posts that contain image links in their body and ensures
+    the post has substantial text content.
+
+    Args:
+        subreddit_name: The name of the subreddit to scrape.
+        limit: The maximum number of posts to fetch (default is 100).
 
     Returns:
-    A random pure text post object if available, otherwise None.
-    If no pure text posts are found, it returns None and prints a message.
-    If the Reddit client is not initialized, it returns None and prints an error message.   
+        A random pure text post object if available, otherwise None.
+        Returns None if no pure text posts are found or if the Reddit
+        client is not initialized.
     """
     if not reddit_client:
         print("Reddit instance not available.")

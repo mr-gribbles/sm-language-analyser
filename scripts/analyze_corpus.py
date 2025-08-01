@@ -1,35 +1,32 @@
-"""Analyze and save a text corpus file for linguistic metrics.
+"""Corpus analysis script for linguistic metrics.
 
-This script intelligently handles both original and rewritten text from Reddit and Bluesky corpora.
-It performs the following:
-- Loads a JSONL corpus file.
-- Analyzes the text for readability, lexical diversity, and sentiment.
-- Saves the results to a CSV file.
-- Provides a summary of the analysis results.
-- Handles errors gracefully and logs warnings for malformed lines.
-- Uses argparse for command-line interface.
-It ensures that the analysis is performed on the correct text field, whether it is original or rewritten text.
-It also includes error handling for file not found and unexpected errors.
+This script intelligently handles both original and rewritten text from Reddit
+and Bluesky corpora. It loads a JSONL corpus file, analyzes the text for
+readability, lexical diversity, and sentiment, saves the results to a CSV file,
+and provides a summary of the analysis results. It handles errors gracefully
+and logs warnings for malformed lines.
 """
-import json
-import pandas as pd
 import argparse
-import sys
+import json
 import os
+import sys
+
+import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.core_logic.corpus_analyzer import run_full_analysis
 
-def analyze_corpus_file(filepath: str):
-    """
-    Analyzes a corpus file for linguistic metrics and saves the results to a CSV file.
 
-    Keyword arguments:
-    filepath -- The path to the .jsonl corpus file to analyze.  
+def analyze_corpus_file(filepath: str):
+    """Analyze a corpus file for linguistic metrics and save results to CSV.
+
+    Args:
+        filepath: The path to the .jsonl corpus file to analyze.
 
     Returns:
-    None. The results are saved to a CSV file with the same name as the input file
+        None. The results are saved to a CSV file with the same name as
+        the input file.
     """
     if not filepath.endswith('.jsonl'):
         print("Error: Please provide a valid .jsonl file.")

@@ -1,16 +1,27 @@
-import sys
+"""Tests for the corpus manager module.
+
+This module contains unit tests for the corpus_manager functionality,
+including tests for creating corpus records from Reddit and Bluesky posts.
+"""
 import os
-import pytest
+import sys
 from unittest.mock import MagicMock
+
+import pytest
 
 # Add the project root to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.core_logic.corpus_manager import create_corpus_record
 
+
 @pytest.fixture
 def reddit_post():
-    """Provides a mock Reddit post object for testing."""
+    """Provide a mock Reddit post object for testing.
+    
+    Returns:
+        MagicMock: A mock Reddit post object with test data.
+    """
     post = MagicMock()
     post.id = "test_id"
     post.permalink = "/r/test/comments/test_id"
@@ -21,7 +32,11 @@ def reddit_post():
 
 @pytest.fixture
 def bluesky_post():
-    """Provides a mock Bluesky post object for testing."""
+    """Provide a mock Bluesky post object for testing.
+    
+    Returns:
+        MagicMock: A mock Bluesky post object with test data.
+    """
     post = MagicMock()
     post.uri = "at://did:plc:test/app.bsky.feed.post/test_rkey"
     post.cid = "test_cid"
@@ -31,7 +46,11 @@ def bluesky_post():
     return post
 
 def test_create_corpus_record_reddit(reddit_post):
-    """Ensures that a Reddit corpus record is created correctly."""
+    """Test that a Reddit corpus record is created correctly.
+    
+    Args:
+        reddit_post: Mock Reddit post fixture.
+    """
     source_details = {
         "platform": "Reddit",
         "post_id": reddit_post.id,
@@ -50,7 +69,11 @@ def test_create_corpus_record_reddit(reddit_post):
     assert record["llm_transformation"] is None
 
 def test_create_corpus_record_bluesky_with_rewrite(bluesky_post):
-    """Ensures that a Bluesky corpus record with a rewrite is created correctly."""
+    """Test that a Bluesky corpus record with a rewrite is created correctly.
+    
+    Args:
+        bluesky_post: Mock Bluesky post fixture.
+    """
     source_details = {
         "platform": "Bluesky",
         "post_uri": bluesky_post.uri,

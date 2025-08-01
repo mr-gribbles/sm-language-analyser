@@ -1,19 +1,29 @@
-"""Manages the creation and saving of corpus records for Reddit and Bluesky posts.
+"""Corpus record creation and management for social media posts.
 
-This module provides functions to create structured records for posts collected from Reddit and Bluesky,
-and save them in the official corpus JSON format. It handles both original and rewritten content,
-including metadata about the source, content, and any transformations applied by LLMs.
+This module provides functions to create structured records for posts collected
+from Reddit and Bluesky, and save them in the official corpus JSON format.
+It handles both original and rewritten content, including metadata about the
+source, content, and any transformations applied by LLMs.
 """
-
-import os
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 
 
-def create_corpus_record(source_details, original_content, rewritten_text=None, llm_model=None, prompt_template=None):
-    """
-    Structures collected data into the official corpus JSON format.
+def create_corpus_record(source_details, original_content, rewritten_text=None,
+                         llm_model=None, prompt_template=None):
+    """Structure collected data into the official corpus JSON format.
+
+    Args:
+        source_details: Dictionary containing platform-specific source metadata.
+        original_content: Dictionary containing the original post content.
+        rewritten_text: Optional rewritten text from LLM transformation.
+        llm_model: Optional name of the LLM model used for rewriting.
+        prompt_template: Optional prompt template used for rewriting.
+
+    Returns:
+        A structured corpus record dictionary in the official format.
     """
     record = {
         "corpus_item_id": str(uuid.uuid4()),
@@ -34,12 +44,12 @@ def create_corpus_record(source_details, original_content, rewritten_text=None, 
 
 
 def save_record_to_corpus(record, directory, filename):
-    """Saves a corpus record to a specified directory in JSON Lines format.
-    
-    Keyword arguments:
-    record -- The corpus record dictionary to save.
-    directory -- The directory where the record should be saved.
-    filename -- The name of the file to save the record in.
+    """Save a corpus record to a specified directory in JSON Lines format.
+
+    Args:
+        record: The corpus record dictionary to save.
+        directory: The directory where the record should be saved.
+        filename: The name of the file to save the record in.
     """
     try:
         os.makedirs(directory, exist_ok=True)

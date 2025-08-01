@@ -1,3 +1,9 @@
+"""Data collection and processing pipeline for social media platforms.
+
+This module orchestrates the entire data collection process, including scraping,
+cleaning, optional LLM rewriting, and corpus storage for both Reddit and
+Bluesky platforms.
+"""
 import time
 from datetime import datetime, timezone
 from src import config
@@ -10,16 +16,17 @@ from src.core_logic.corpus_manager import (
 from src.scrapers.reddit_scraper import get_random_text_post
 from src.scrapers.bluesky_scraper import fetch_bluesky_timeline_page
 
-def run_pipeline(platform: str, rewrite: bool, num_posts: int = None, reddit_limit: int = None, bluesky_limit: int = None):
-    """
-    Runs the data collection and processing pipeline for the specified platform.
+
+def run_pipeline(platform: str, rewrite: bool, num_posts: int = None,
+                 reddit_limit: int = None, bluesky_limit: int = None):
+    """Run the data collection and processing pipeline for the specified platform.
 
     Args:
-        platform (str): The platform to scrape data from ('reddit' or 'bluesky').
-        rewrite (bool): Whether to rewrite the posts using an LLM.
-        num_posts (int, optional): The number of posts to collect. Defaults to config.
-        reddit_limit (int, optional): The sample limit for Reddit. Defaults to config.
-        bluesky_limit (int, optional): The sample limit for Bluesky. Defaults to config.
+        platform: The platform to scrape data from ('reddit' or 'bluesky').
+        rewrite: Whether to rewrite the posts using an LLM.
+        num_posts: The number of posts to collect. Defaults to config value.
+        reddit_limit: The sample limit for Reddit. Defaults to config value.
+        bluesky_limit: The sample limit for Bluesky. Defaults to config value.
     """
     num_posts_to_collect = num_posts or config.NUM_POSTS_TO_COLLECT
     if rewrite:
@@ -46,7 +53,17 @@ def run_pipeline(platform: str, rewrite: bool, num_posts: int = None, reddit_lim
 
     print(f"\n--- {platform.capitalize()} {pipeline_type} Pipeline Complete ---")
 
-def _run_reddit_pipeline(rewrite: bool, output_dir: str, output_filename: str, num_posts_to_collect: int, sample_limit: int):
+def _run_reddit_pipeline(rewrite: bool, output_dir: str, output_filename: str,
+                         num_posts_to_collect: int, sample_limit: int):
+    """Run the Reddit-specific data collection pipeline.
+
+    Args:
+        rewrite: Whether to rewrite posts using LLM.
+        output_dir: Directory to save the collected data.
+        output_filename: Name of the output file.
+        num_posts_to_collect: Number of posts to collect.
+        sample_limit: Maximum number of posts to sample from each subreddit.
+    """
     collected_ids = set()
     while len(collected_ids) < num_posts_to_collect:
         target_subreddit = config.get_target_subreddit()
@@ -89,7 +106,17 @@ def _run_reddit_pipeline(rewrite: bool, output_dir: str, output_filename: str, n
             print(f"Collected Post {len(collected_ids)}/{num_posts_to_collect}. ID: {post.id}")
         time.sleep(config.SLEEP_TIMER)
 
-def _run_bluesky_pipeline(rewrite: bool, output_dir: str, output_filename: str, num_posts_to_collect: int, sample_limit: int):
+def _run_bluesky_pipeline(rewrite: bool, output_dir: str, output_filename: str,
+                          num_posts_to_collect: int, sample_limit: int):
+    """Run the Bluesky-specific data collection pipeline.
+
+    Args:
+        rewrite: Whether to rewrite posts using LLM.
+        output_dir: Directory to save the collected data.
+        output_filename: Name of the output file.
+        num_posts_to_collect: Number of posts to collect.
+        sample_limit: Maximum number of posts to sample from timeline.
+    """
     collected_uris = set()
     post_buffer = []
     cursor = None
