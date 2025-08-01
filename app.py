@@ -4,7 +4,7 @@ import time
 import glob
 import json
 from datetime import datetime, timezone
-from flask import Flask, render_template, request, Response, jsonify, flash
+from flask import Flask, render_template, request, Response, jsonify, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from threading import Thread
 
@@ -52,6 +52,18 @@ def get_corpus_files():
         'original': [os.path.basename(f) for f in original_files],
         'rewritten': [os.path.basename(f) for f in rewritten_files]
     })
+
+@app.route('/download/<corpus_type>/<filename>')
+def download_file(corpus_type, filename):
+    """Serves corpus files for download."""
+    if corpus_type == 'original':
+        directory = 'corpora/original_only'
+    elif corpus_type == 'rewritten':
+        directory = 'corpora/rewritten_pairs'
+    else:
+        return "Invalid corpus type", 404
+    
+    return send_from_directory(directory, filename, as_attachment=True)
 
 @app.route('/run', methods=['POST'])
 def run():
