@@ -1,8 +1,12 @@
-# Social Media Language Analyser (v2.0 - Refactored CLI)
+# Social Media Language Analyser
 
 > **Branch Overview:** This branch contains the modern, command-line version of the application. It is the primary development branch for core features. For the legacy version, see the `legacy/v1.0` branch. For the web interface, see the `feature/web-gui` branch.
 
 A modular Python pipeline for sourcing, cleaning, rewriting, and analyzing text data from Reddit and Bluesky to create structured corpora for NLP research.
+
+## Description
+
+This project provides a comprehensive, end-to-end solution for building high-quality text corpora from social media platforms. It features a robust, modular architecture that separates concerns into distinct components for data sourcing, cleaning, LLM-powered rewriting, and linguistic analysis. The system includes four independent pipelines to collect both original and LLM-rewritten posts from Reddit and Bluesky, ensuring data integrity and variety. 
 
 **Check out my website for a publicly avaliable web client:** [https://sm-language.up.railway.app](https://sm-language.up.railway.app)
 
