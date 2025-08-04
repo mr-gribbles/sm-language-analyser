@@ -133,5 +133,9 @@ cython_debug/
 # Corpora
 corpora/
 
+# Data files
+models/
+plots/
+
 # Analysis Results
 analysis_results/
