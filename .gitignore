@@ -137,6 +137,7 @@ corpora/
 # Data files
 models/
 plots/
+test_file/
 
 # Analysis Results
 analysis_results/

@@ -31,7 +31,7 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
 
     # Prepare the output filename based on the directory name and current timestamp
     dir_name = os.path.basename(os.path.normpath(directory))
-    timestamp = datetime.now().strftime("%Y%m%d")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_filename = f"combined_{dir_name}_{timestamp}.jsonl"
     output_filepath = os.path.join(directory, output_filename)
 
