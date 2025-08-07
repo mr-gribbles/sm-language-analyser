@@ -305,8 +305,8 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="gemini-1.5-flash",
-        help="LLM model to use (default: gemini-1.5-flash)"
+        default="gemini-2.5-flash",
+        help="LLM model to use (default: gemini-2.5-flash)"
     )
     
     parser.add_argument(
