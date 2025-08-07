@@ -18,7 +18,7 @@ import os
 # Add the parent directory to the path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.core_logic.llm_rewriter import rewrite_text_with_gemini
+from src.core_logic.llm_text_generator import generate_text_with_gemini
 from src.core_logic.corpus_manager import save_record_to_corpus
 from src import config
 
@@ -165,10 +165,9 @@ class LLMCorpusGenerator:
         full_prompt = f"{style}\n\n{base_prompt}"
         
         # Generate text using the LLM
-        generated_text = rewrite_text_with_gemini(
-            text_to_rewrite="",  # Empty since we're generating from scratch
-            model_name=self.model_name,
-            prompt_template=full_prompt
+        generated_text = generate_text_with_gemini(
+            prompt=full_prompt,
+            model_name=self.model_name
         )
         
         return generated_text
@@ -249,10 +248,8 @@ class LLMCorpusGenerator:
         
         generated_count = 0
         
-        print(f"Generating {num_texts} LLM-written academic texts...")
-        print(f"Model: {self.model_name}")
+        print(f"Generating {num_texts} academic texts using {self.model_name}")
         print(f"Output: {output_dir}/{output_file}")
-        print("-" * 50)
         
         for i in range(num_texts):
             try:
@@ -261,7 +258,7 @@ class LLMCorpusGenerator:
                 style = random.choice(styles)
                 topic = random.choice(prompt_info["topics"])
                 
-                print(f"Generating {i+1}/{num_texts}: {prompt_info['category']} on '{topic}'")
+                print(f"Generating {i+1}/{num_texts}: {prompt_info['category']}")
                 
                 # Generate text
                 generated_text = self.generate_academic_text(prompt_info, style)
@@ -276,20 +273,19 @@ class LLMCorpusGenerator:
                     save_record_to_corpus(corpus_entry, output_dir, output_file)
                     generated_count += 1
                     
-                    print(f"  ✅ Generated {len(generated_text.split())} words")
+                    print(f"Generated {len(generated_text.split())} words")
                 else:
-                    print(f"  ❌ Generation failed or too short")
+                    print(f"Generation failed or too short")
                 
                 # Rate limiting
                 if i < num_texts - 1:  # Don't delay after the last generation
                     time.sleep(delay)
                     
             except Exception as e:
-                print(f"  ❌ Error generating text {i+1}: {e}")
+                print(f"Error generating text {i+1}: {e}")
                 continue
         
-        print("-" * 50)
-        print(f"Successfully generated {generated_count}/{num_texts} texts")
+        print(f"Generated {generated_count}/{num_texts} texts successfully")
         return generated_count
 
 
@@ -357,19 +353,15 @@ def main():
         )
         
         if generated_count > 0:
-            print(f"\n🎉 Corpus generation complete!")
-            print(f"Generated {generated_count} texts saved to:")
-            print(f"  {args.output_dir}/{args.output_file}")
-            print(f"\nNext steps:")
-            print(f"1. Collect human-written papers: python main.py --category cs.AI --max-papers {generated_count}")
-            print(f"2. Train classifier: python scripts/train_classifier.py")
+            print(f"Corpus generation complete")
+            print(f"Generated {generated_count} texts saved to: {args.output_dir}/{args.output_file}")
         else:
-            print(f"\n❌ No texts were generated successfully.")
+            print(f"No texts were generated successfully")
             
     except KeyboardInterrupt:
-        print(f"\n⚠️  Generation interrupted by user.")
+        print(f"Generation interrupted by user")
     except Exception as e:
-        print(f"\n❌ Error during generation: {e}")
+        print(f"Error during generation: {e}")
         return 1
     
     return 0

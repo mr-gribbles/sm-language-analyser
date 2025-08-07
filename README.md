@@ -1,16 +1,17 @@
 # Academic Paper Analysis Pipeline
 
-A modular Python pipeline for collecting, cleaning, rewriting, and analyzing academic papers from arXiv to create structured corpora for NLP research and AI vs Human text classification.
+A modular Python pipeline for collecting, cleaning, and analyzing academic papers from arXiv to create structured corpora for NLP research and AI vs Human text classification.
 
 ## Description
 
-This project provides a comprehensive, end-to-end solution for building high-quality text corpora from academic papers. It features a robust, modular architecture that separates concerns into distinct components for data sourcing, cleaning, LLM-powered rewriting, and linguistic analysis. The system collects both original academic papers and LLM-rewritten versions to create datasets suitable for training AI detection models.
+This project provides a comprehensive, end-to-end solution for building high-quality text corpora from academic papers. It features a robust, modular architecture that separates concerns into distinct components for data sourcing, cleaning, and linguistic analysis. The system collects original academic papers and provides a separate LLM corpus generator to create AI-generated text for training AI detection models.
 
 ## Features
 
 - **arXiv Integration**: Direct access to 2+ million academic papers
 - **Smart Filtering**: Automatic quality assessment and English language detection
-- **LLM Rewriting**: Optional AI rewriting for creating AI vs Human datasets
+- **Random Category Selection**: Easily build diverse datasets across academic domains
+- **Separate LLM Corpus Generator**: Dedicated tool for creating AI-generated academic text
 - **Neural Network Classifier**: PyTorch-based binary classifier for AI detection
 - **Flexible Search**: Query by keywords, categories, or date ranges
 - **Rate Limiting**: Respects arXiv API guidelines with proper delays
@@ -62,8 +63,11 @@ python main.py --category cs.AI --max-papers 100
 # Search by query
 python main.py --query "neural networks" --max-papers 50
 
-# With LLM rewriting for AI detection training
-python main.py --category cs.AI --max-papers 100 --rewrite
+# Randomly select a category (great for diverse datasets!)
+python main.py --random --max-papers 100
+
+# List all available categories
+python main.py --list-categories
 ```
 
 #### Advanced Collection
@@ -139,8 +143,10 @@ python scripts/train_classifier.py
 python main.py --category cs.CL --max-papers 800
 python main.py --query "natural language processing" --max-papers 400
 
-# Create AI detection dataset
-python main.py --category cs.CL --max-papers 500 --rewrite
+# Generate AI text for training (use separate LLM corpus generator)
+python scripts/generate_llm_corpus.py --num-texts 500
+
+# Train classifier
 python scripts/train_classifier.py
 ```
 
@@ -170,13 +176,14 @@ The included PyTorch-based classifier can distinguish between human-written and 
 │   ├── core_logic/
 │   │   ├── corpus_manager.py        # Corpus management
 │   │   ├── data_cleaner.py          # Text cleaning
-│   │   └── llm_rewriter.py          # LLM rewriting
+│   │   └── llm_text_generator.py    # LLM text generation (for corpus generator)
 │   ├── ml/
 │   │   └── text_classifier.py       # Neural network classifier
 │   ├── config.py                    # Configuration
-│   └── pipeline.py                  # Main pipeline
+│   └── arxiv_paper_collector.py     # Paper collection pipeline
 ├── scripts/
 │   ├── collect_arxiv_papers.py      # Advanced collection script
+│   ├── generate_llm_corpus.py       # LLM corpus generator
 │   ├── train_classifier.py          # Model training
 │   ├── validate_classifier.py       # Model validation
 │   ├── analyze_corpus.py            # Corpus analysis
