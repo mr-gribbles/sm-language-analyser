@@ -113,13 +113,13 @@ def check_corpus_data():
     
     if not human_files:
         print("❌ No human text data found in corpora/original_only/")
-        print("   Run: python main.py --platform reddit --rewrite false --num-posts 500")
+        print("   Run: python main.py --category cs.AI --max-papers 500")
     else:
         print(f"✅ Found {len(human_files)} human text file(s)")
     
     if not ai_files:
         print("❌ No AI text data found in corpora/rewritten_pairs/")
-        print("   Run: python main.py --platform reddit --rewrite true --num-posts 500")
+        print("   Run: python main.py --category cs.AI --max-papers 500 --rewrite")
     else:
         print(f"✅ Found {len(ai_files)} AI text file(s)")
     

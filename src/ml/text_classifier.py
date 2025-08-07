@@ -116,15 +116,8 @@ class AIHumanTextClassifier:
                     for line in f:
                         try:
                             record = json.loads(line.strip())
-                            # Use cleaned text if available, otherwise raw text
-                            if 'cleaned_text' in record['original_content']:
-                                text = record['original_content']['cleaned_text']
-                            elif 'cleaned_selftext' in record['original_content']:
-                                text = record['original_content']['cleaned_selftext']
-                            else:
-                                # Fallback to raw text
-                                text = record['original_content'].get('raw_text', 
-                                      record['original_content'].get('raw_selftext', ''))
+                            # Handle different text sources (social media vs academic papers)
+                            text = self._extract_text_from_record(record, 'original_content')
                             
                             if text and len(text.strip()) > 10:  # Filter very short texts
                                 texts.append(text.strip())
@@ -133,7 +126,7 @@ class AIHumanTextClassifier:
                             print(f"Error processing line in {file_path}: {e}")
                             continue
         
-        # Load AI-rewritten texts (label = 1)
+        # Load AI-rewritten texts (label = 1) from rewritten_pairs directory
         rewritten_dir = corpus_path / "rewritten_pairs"
         if rewritten_dir.exists():
             for file_path in rewritten_dir.glob("*.jsonl"):
@@ -147,6 +140,25 @@ class AIHumanTextClassifier:
                                 if text and len(text.strip()) > 10:  # Filter very short texts
                                     texts.append(text.strip())
                                     labels.append(1)  # AI-generated
+                        except (json.JSONDecodeError, KeyError) as e:
+                            print(f"Error processing line in {file_path}: {e}")
+                            continue
+        
+        # Load LLM-generated texts (label = 1) from llm_generated directory
+        llm_generated_dir = corpus_path / "llm_generated"
+        if llm_generated_dir.exists():
+            for file_path in llm_generated_dir.glob("*.jsonl"):
+                print(f"Loading LLM-generated texts from: {file_path}")
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        try:
+                            record = json.loads(line.strip())
+                            # Handle LLM-generated corpus format
+                            text = self._extract_text_from_record(record, 'original_content')
+                            
+                            if text and len(text.strip()) > 10:  # Filter very short texts
+                                texts.append(text.strip())
+                                labels.append(1)  # AI-generated
                         except (json.JSONDecodeError, KeyError) as e:
                             print(f"Error processing line in {file_path}: {e}")
                             continue
@@ -554,6 +566,38 @@ class AIHumanTextClassifier:
             predictions = (outputs > 0.5).float().cpu().numpy().flatten().astype(int)
         
         return predictions, probabilities
+    
+    def _extract_text_from_record(self, record: Dict, content_key: str) -> str:
+        """Extract text from a corpus record, handling different formats.
+        
+        Args:
+            record: The corpus record dictionary.
+            content_key: The key containing the content ('original_content' or similar).
+            
+        Returns:
+            Extracted text string.
+        """
+        content = record.get(content_key, {})
+        
+        # Try different text fields in order of preference
+        text_fields = [
+            'cleaned_text',      # Academic papers and cleaned social media
+            'cleaned_selftext',  # Reddit posts
+            'raw_text',          # Raw academic papers and Bluesky
+            'raw_selftext',      # Raw Reddit posts
+            'abstract',          # Academic paper abstracts only
+            'title'              # Fallback to title only
+        ]
+        
+        for field in text_fields:
+            if field in content and content[field]:
+                text = content[field]
+                # For academic papers, combine title and abstract if both exist
+                if field == 'abstract' and 'title' in content and content['title']:
+                    text = f"{content['title']}\n\n{text}"
+                return text
+        
+        return ""
     
     def save_model(self, model_path: str):
         """Save the trained model and preprocessing components.
