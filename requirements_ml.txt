@@ -10,6 +10,9 @@ pandas>=2.0.0
 # Text processing
 nltk>=3.8.0
 
+# LLM Integration
+google-generativeai>=0.3.0
+
 # Visualization
 matplotlib>=3.7.0
 seaborn>=0.12.0

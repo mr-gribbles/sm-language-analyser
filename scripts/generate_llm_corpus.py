@@ -26,7 +26,7 @@ from src import config
 class LLMCorpusGenerator:
     """Generator for creating diverse LLM-written academic text."""
     
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, model_name: str = "gemini-2.5-flash-lite"):
         """Initialize the LLM corpus generator.
         
         Args:
@@ -42,8 +42,9 @@ class LLMCorpusGenerator:
             List of prompt dictionaries with templates and metadata.
         """
         prompts = [
+            # Computer Science & Technical Topics
             {
-                "category": "abstract_generation",
+                "category": "cs_abstract_generation",
                 "template": "Write an academic abstract for a research paper about {topic}. Include background, methodology, results, and conclusions. Make it 150-250 words.",
                 "topics": [
                     "machine learning optimization algorithms",
@@ -59,23 +60,7 @@ class LLMCorpusGenerator:
                 ]
             },
             {
-                "category": "introduction_generation",
-                "template": "Write the introduction section of an academic paper about {topic}. Include motivation, problem statement, and contribution overview. Make it 200-300 words.",
-                "topics": [
-                    "automated theorem proving using neural networks",
-                    "blockchain applications in supply chain management",
-                    "edge computing for IoT data processing",
-                    "explainable AI in healthcare decision making",
-                    "multi-modal learning for autonomous vehicles",
-                    "privacy-preserving machine learning techniques",
-                    "sustainable AI and green computing",
-                    "human-AI collaboration in creative tasks",
-                    "bias detection and mitigation in NLP models",
-                    "continual learning in dynamic environments"
-                ]
-            },
-            {
-                "category": "methodology_generation",
+                "category": "cs_methodology_generation",
                 "template": "Write a methodology section for a research paper on {topic}. Describe the approach, experimental setup, and evaluation metrics. Make it 250-350 words.",
                 "topics": [
                     "few-shot learning for image classification",
@@ -90,36 +75,158 @@ class LLMCorpusGenerator:
                     "causal inference in machine learning"
                 ]
             },
+            
+            # Psychology Topics
             {
-                "category": "related_work",
-                "template": "Write a related work section for a paper on {topic}. Compare different approaches and highlight gaps in current research. Make it 200-300 words.",
+                "category": "psychology_abstract_generation",
+                "template": "Write an academic abstract for a psychology research paper about {topic}. Include background, methodology, results, and conclusions. Make it 150-250 words.",
                 "topics": [
-                    "generative adversarial networks for data augmentation",
-                    "transfer learning in low-resource scenarios",
-                    "interpretable machine learning methods",
-                    "robust optimization under uncertainty",
-                    "online learning algorithms",
-                    "dimensionality reduction techniques",
-                    "ensemble methods for improved accuracy",
-                    "anomaly detection in time series data",
-                    "recommendation systems using deep learning",
-                    "natural language generation evaluation metrics"
+                    "cognitive biases in decision-making processes",
+                    "the impact of social media on adolescent mental health",
+                    "neuroplasticity and learning in older adults",
+                    "attachment styles and romantic relationship satisfaction",
+                    "the effectiveness of mindfulness-based interventions for anxiety",
+                    "working memory capacity and academic performance",
+                    "cultural differences in emotional expression and regulation",
+                    "the role of sleep in memory consolidation",
+                    "behavioral interventions for addiction recovery",
+                    "developmental psychology of moral reasoning in children"
                 ]
             },
             {
-                "category": "discussion_generation",
-                "template": "Write a discussion section for a research paper on {topic}. Analyze results, discuss implications, and mention limitations. Make it 200-300 words.",
+                "category": "psychology_methodology_generation",
+                "template": "Write a methodology section for a psychology study on {topic}. Describe participants, procedures, measures, and analysis plan. Make it 250-350 words.",
                 "topics": [
-                    "ethical considerations in AI decision making",
-                    "scalability challenges in distributed learning",
-                    "robustness of neural networks to adversarial examples",
-                    "interpretability vs accuracy trade-offs",
-                    "data quality impact on model performance",
-                    "computational efficiency of modern architectures",
-                    "generalization capabilities across domains",
-                    "fairness in algorithmic decision making",
-                    "environmental impact of large-scale training",
-                    "human factors in AI system design"
+                    "longitudinal study of personality development",
+                    "experimental investigation of stereotype threat",
+                    "cross-cultural comparison of parenting styles",
+                    "neuroimaging study of emotion regulation",
+                    "randomized controlled trial of therapy effectiveness",
+                    "observational study of child social behavior",
+                    "survey research on workplace stress and burnout",
+                    "meta-analysis of cognitive behavioral therapy outcomes",
+                    "qualitative study of trauma recovery experiences",
+                    "psychometric validation of a new assessment tool"
+                ]
+            },
+            
+            # Philosophy Topics
+            {
+                "category": "philosophy_abstract_generation",
+                "template": "Write an academic abstract for a philosophy paper about {topic}. Include the philosophical problem, argument, and conclusions. Make it 150-250 words.",
+                "topics": [
+                    "the nature of consciousness and the hard problem",
+                    "moral responsibility in deterministic universes",
+                    "epistemic justification and the Gettier problem",
+                    "personal identity and psychological continuity",
+                    "the ethics of artificial intelligence and automation",
+                    "free will and moral accountability",
+                    "the problem of evil and theodicy",
+                    "virtue ethics and character development",
+                    "the nature of time and temporal experience",
+                    "distributive justice and economic inequality"
+                ]
+            },
+            {
+                "category": "philosophy_argument_generation",
+                "template": "Write a philosophical argument about {topic}. Present the problem, develop your position, consider objections, and defend your view. Make it 300-400 words.",
+                "topics": [
+                    "the moral status of non-human animals",
+                    "whether knowledge requires certainty",
+                    "the relationship between mind and body",
+                    "the foundations of moral obligation",
+                    "the nature of aesthetic experience",
+                    "political authority and the social contract",
+                    "the problem of induction in scientific reasoning",
+                    "environmental ethics and our duties to nature",
+                    "the meaning of life and human purpose",
+                    "the ethics of genetic enhancement"
+                ]
+            },
+            
+            # Business & Management Topics
+            {
+                "category": "business_abstract_generation",
+                "template": "Write an academic abstract for a business research paper about {topic}. Include background, methodology, findings, and implications. Make it 150-250 words.",
+                "topics": [
+                    "the impact of remote work on organizational culture",
+                    "sustainable business practices and financial performance",
+                    "digital transformation strategies in traditional industries",
+                    "consumer behavior in e-commerce environments",
+                    "leadership styles and employee engagement",
+                    "supply chain resilience during global disruptions",
+                    "the role of artificial intelligence in customer service",
+                    "corporate social responsibility and brand loyalty",
+                    "innovation management in startup ecosystems",
+                    "cross-cultural negotiations in international business"
+                ]
+            },
+            {
+                "category": "business_case_study_generation",
+                "template": "Write a business case study analysis of {topic}. Include situation analysis, key challenges, strategic options, and recommendations. Make it 300-400 words.",
+                "topics": [
+                    "a company's digital marketing transformation",
+                    "merger and acquisition integration challenges",
+                    "crisis management during a product recall",
+                    "entering emerging markets with cultural barriers",
+                    "implementing sustainable manufacturing processes",
+                    "managing organizational change during restructuring",
+                    "developing new products for changing demographics",
+                    "competitive strategy in disrupted industries",
+                    "building strategic partnerships and alliances",
+                    "managing stakeholder relationships during growth"
+                ]
+            },
+            
+            # Economics Topics
+            {
+                "category": "economics_abstract_generation",
+                "template": "Write an academic abstract for an economics research paper about {topic}. Include research question, methodology, findings, and policy implications. Make it 150-250 words.",
+                "topics": [
+                    "the effects of minimum wage increases on employment",
+                    "behavioral economics and consumer decision-making",
+                    "the impact of automation on labor markets",
+                    "monetary policy effectiveness during economic crises",
+                    "income inequality and economic growth",
+                    "the economics of climate change and carbon pricing",
+                    "international trade and economic development",
+                    "financial market volatility and investor behavior",
+                    "the gig economy and traditional employment models",
+                    "healthcare economics and policy reform"
+                ]
+            },
+            {
+                "category": "economics_analysis_generation",
+                "template": "Write an economic analysis of {topic}. Include theoretical framework, empirical evidence, and policy recommendations. Make it 300-400 words.",
+                "topics": [
+                    "the economic impact of universal basic income",
+                    "market failures in healthcare systems",
+                    "the economics of education and human capital",
+                    "fiscal policy responses to economic recessions",
+                    "the role of central banks in financial stability",
+                    "economic effects of immigration policies",
+                    "competition policy in digital markets",
+                    "the economics of renewable energy transition",
+                    "urban economics and housing affordability",
+                    "international development and poverty reduction"
+                ]
+            },
+            
+            # Interdisciplinary Topics
+            {
+                "category": "interdisciplinary_abstract_generation",
+                "template": "Write an academic abstract for an interdisciplinary research paper about {topic}. Include multiple perspectives, methodology, and broader implications. Make it 150-250 words.",
+                "topics": [
+                    "the psychology of economic decision-making",
+                    "ethical implications of business automation",
+                    "philosophical foundations of psychological research",
+                    "economic analysis of mental health interventions",
+                    "business applications of behavioral psychology",
+                    "the ethics of economic inequality",
+                    "psychological factors in consumer economics",
+                    "philosophical perspectives on business ethics",
+                    "economic psychology of financial decision-making",
+                    "the intersection of technology, ethics, and society"
                 ]
             }
         ]
@@ -305,8 +412,8 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="gemini-2.5-flash",
-        help="LLM model to use (default: gemini-2.5-flash)"
+        default="gemini-2.5-flash-lite",
+        help="LLM model to use (default: gemini-2.5-flash-lite)"
     )
     
     parser.add_argument(
