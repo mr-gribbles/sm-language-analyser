@@ -62,7 +62,7 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
                     for line in infile:
                         try:
                             post = json.loads(line)
-                            post_id = post.get('corpus_item_id')
+                            post_id = post.get('corpus_item_id') or post.get('id')
 
                             if post_id and post_id not in seen_post_ids:
                                 outfile.write(line)

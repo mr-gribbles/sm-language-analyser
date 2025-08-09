@@ -279,17 +279,23 @@ class EnhancedAIHumanTextClassifier:
                 except (json.JSONDecodeError, KeyError) as e:
                     continue
         
-        # Load AI-rewritten texts (label = 1)
         print(f"Loading AI texts from: {ai_file}")
         with open(ai_file, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
+                    text = None
                     if record.get('llm_transformation') and record['llm_transformation'].get('rewritten_text'):
                         text = record['llm_transformation']['rewritten_text']
-                        if text and len(text.strip()) > 20:  # Filter very short texts
-                            texts.append(text.strip())
-                            labels.append(1)  # AI-generated
+                    elif 'original_content' in record:
+                        if 'cleaned_text' in record['original_content']:
+                            text = record['original_content']['cleaned_text']
+                        elif 'raw_text' in record['original_content']:
+                            text = record['original_content']['raw_text']
+                    
+                    if text and len(text.strip()) > 20:  # Filter very short texts
+                        texts.append(text.strip())
+                        labels.append(1)  # AI-generated
                 except (json.JSONDecodeError, KeyError) as e:
                     continue
         
