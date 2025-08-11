@@ -138,6 +138,8 @@ corpora/
 models/
 plots/
 test_file/
+*.json
+*.jsonl
 
 # Analysis Results
 analysis_results/

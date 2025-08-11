@@ -507,6 +507,7 @@ class EnhancedAIHumanTextClassifier:
             'test_accuracy': test_accuracy,
             'test_precision': class_report['weighted avg']['precision'],
             'test_recall': class_report['weighted avg']['recall'],
+            'test_f1': class_report['weighted avg']['f1-score'],  # Add missing F1 score
             'classification_report': class_report,
             'confusion_matrix': confusion_matrix(y_test, test_predictions),
             'feature_count': features_scaled.shape[1]

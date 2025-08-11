@@ -12,7 +12,7 @@ from pathlib import Path
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.ml.text_classifier_enhanced import EnhancedAIHumanTextClassifier
+from src.ml.text_classifier import EnhancedAIHumanTextClassifier
 
 
 def main():
