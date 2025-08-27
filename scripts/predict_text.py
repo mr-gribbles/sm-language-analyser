@@ -7,6 +7,8 @@ import sys
 import os
 import argparse
 from pathlib import Path
+import warnings
+from sklearn.exceptions import ConvergenceWarning
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -14,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.ml.text_classifier import EnhancedAIHumanTextClassifier
 from src.ml.classical_classifiers import ClassicalTextClassifier
 from src.ml.ensemble_classifiers import EnsembleTextClassifier
+from src.ml.hybrid_classifier import HybridTextClassifier
 
 
 def predict_single_text(classifier, text, model_type):
@@ -214,6 +217,20 @@ def load_ensemble_model(model_path, ensemble_type):
     return classifier, f"Ensemble: {ensemble_type.title()}"
 
 
+def load_hybrid_model(model_path):
+    """Load hybrid model.
+    
+    Args:
+        model_path: Base path to the hybrid model files.
+        
+    Returns:
+        Tuple of (classifier instance, model type description).
+    """
+    classifier = HybridTextClassifier()
+    classifier.load_model(model_path)
+    return classifier, "Hybrid Sequential"
+
+
 def discover_available_models():
     """Discover all available trained models.
     
@@ -223,12 +240,14 @@ def discover_available_models():
     available_models = {
         'neural': [],
         'classical': [],
-        'ensemble': []
+        'ensemble': [],
+        'hybrid': []
     }
     
     # Standard model paths
     neural_path_1 = "models/ai_human_classifier_enhanced"
     neural_path_2 = "models/comparison_enhanced_neural_network"
+    hybrid_path = "models/ai_human_classifier_hybrid"
     comparison_path = "models/comparison"
     
     # Check for neural network (try both possible paths)
@@ -249,6 +268,16 @@ def discover_available_models():
         available_models['neural'].append(('enhanced_neural_network', neural_path_1))
     elif all(Path(f).exists() for f in neural_files_2):
         available_models['neural'].append(('enhanced_neural_network', neural_path_2))
+
+    # Check for hybrid model
+    hybrid_files = [
+        f"{hybrid_path}_hybrid_model.pth",
+        f"{hybrid_path}_hybrid_word_vectorizer.pkl",
+        f"{hybrid_path}_hybrid_char_vectorizer.pkl",
+        f"{hybrid_path}_hybrid_scaler.pkl"
+    ]
+    if all(Path(f).exists() for f in hybrid_files):
+        available_models['hybrid'].append(('hybrid', hybrid_path))
     
     # Check for classical models
     classical_types = ['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
@@ -291,9 +320,10 @@ def predict_with_all_models(text):
     """
     available_models = discover_available_models()
     
-    total_models = (len(available_models['neural']) + 
-                   len(available_models['classical']) + 
-                   len(available_models['ensemble']))
+    total_models = (len(available_models['neural']) +
+                   len(available_models['classical']) +
+                   len(available_models['ensemble']) +
+                   len(available_models['hybrid']))
     
     if total_models == 0:
         print("No trained models found. Train some models first using:")
@@ -372,6 +402,28 @@ def predict_with_all_models(text):
             
         except Exception as e:
             print(f"Ensemble: {model_name.title():<20} ERROR: {str(e)}")
+
+    # Hybrid model predictions
+    for model_name, model_path in available_models['hybrid']:
+        try:
+            classifier, model_type = load_hybrid_model(model_path)
+            predictions, probabilities = classifier.predict([text])
+            
+            prediction = predictions[0]
+            probability = probabilities[0]
+            
+            if prediction == 1:  # AI
+                label = "AI-generated"
+                confidence = probability
+            else:  # Human
+                label = "Human-written"
+                confidence = 1 - probability
+            
+            results.append((model_type, label, confidence))
+            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
+            
+        except Exception as e:
+            print(f"{model_type:<30} ERROR: {str(e)}")
     
     # Summary statistics
     if results:
@@ -406,9 +458,10 @@ def predict_file_with_all_models(file_path, whole_document=None, separate_lines=
     """
     available_models = discover_available_models()
     
-    total_models = (len(available_models['neural']) + 
-                   len(available_models['classical']) + 
-                   len(available_models['ensemble']))
+    total_models = (len(available_models['neural']) +
+                   len(available_models['classical']) +
+                   len(available_models['ensemble']) +
+                   len(available_models['hybrid']))
     
     if total_models == 0:
         print("No trained models found. Train some models first using:")
@@ -637,7 +690,8 @@ def interactive_all_models_mode():
     
     total_models = (len(available_models['neural']) + 
                    len(available_models['classical']) + 
-                   len(available_models['ensemble']))
+                   len(available_models['ensemble']) +
+                   len(available_models['hybrid']))
     
     if total_models == 0:
         print("No trained models found. Train some models first using:")
@@ -676,12 +730,18 @@ def interactive_all_models_mode():
 
 def main():
     """Main prediction function."""
+    # Suppress warnings during prediction
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
+    warnings.filterwarnings("ignore", category=ConvergenceWarning)
+    
     parser = argparse.ArgumentParser(description='Universal AI vs Human text classifier prediction')
     
     # Model selection
     model_group = parser.add_mutually_exclusive_group(required=True)
     model_group.add_argument('--neural', action='store_true',
                            help='Use neural network model')
+    model_group.add_argument('--hybrid', action='store_true',
+                           help='Use hybrid sequential model')
     model_group.add_argument('--classical', type=str,
                            choices=['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
                                    'naive_bayes', 'knn', 'decision_tree', 'adaboost'],
@@ -728,6 +788,8 @@ def main():
     if args.model_path is None:
         if args.neural:
             args.model_path = "models/ai_human_classifier_enhanced"
+        elif args.hybrid:
+            args.model_path = "models/ai_human_classifier_hybrid"
         elif args.classical:
             args.model_path = f"models/comparison_{args.classical}"
         elif args.ensemble:
@@ -755,6 +817,27 @@ def main():
                 sys.exit(1)
             
             classifier, model_type = load_neural_network(args.model_path)
+
+        elif args.hybrid:
+            # Check hybrid model files
+            model_path = Path(args.model_path)
+            required_files = [
+                f"{model_path}_hybrid_model.pth",
+                f"{model_path}_hybrid_word_vectorizer.pkl",
+                f"{model_path}_hybrid_char_vectorizer.pkl",
+                f"{model_path}_hybrid_scaler.pkl"
+            ]
+            
+            missing_files = [f for f in required_files if not Path(f).exists()]
+            if missing_files:
+                print("Error: Hybrid model files not found:")
+                for f in missing_files:
+                    print(f"  - {f}")
+                print(f"\nTrain a hybrid model first using:")
+                print(f"  python scripts/train_hybrid_classifier.py --human-file <file> --ai-file <file> --model-path {args.model_path}")
+                sys.exit(1)
+            
+            classifier, model_type = load_hybrid_model(args.model_path)
             
         elif args.classical:
             # Check classical model files

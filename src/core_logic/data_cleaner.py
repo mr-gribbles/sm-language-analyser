@@ -11,15 +11,18 @@ from bs4 import BeautifulSoup
 
 
 def clean_text(raw_text: str) -> str:
-    """Perform robust cleaning on raw text data.
+    """Perform light cleaning on raw text data, preserving linguistic features.
+
+    This version of the cleaner is designed to keep important signals for
+    AI vs. human text detection, such as capitalization, punctuation, and emojis.
 
     Args:
         raw_text: The raw text to be cleaned (must be a string).
 
     Returns:
-        A cleaned version of the text with HTML tags removed, punctuation
-        normalized, invisible characters stripped, emojis removed, whitespace
-        normalized, and converted to lowercase.
+        A cleaned version of the text with HTML tags removed, URLs removed,
+        and whitespace normalized. Capitalization, punctuation, and emojis
+        are preserved.
 
     Raises:
         TypeError: If the input is not a string.
@@ -45,24 +48,7 @@ def clean_text(raw_text: str) -> str:
     # 4. Remove URLs
     text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
 
-    # 5. Remove emojis and other pictographic symbols
-    emoji_pattern = re.compile(
-        "["
-        u"\U0001F600-\U0001F64F" u"\U0001F300-\U0001F5FF" u"\U0001F680-\U0001F6FF"
-        u"\U0001F1E0-\U0001F1FF" u"\U00002702-\U000027B0" u"\U000024C2-\U0001F251"
-        u"\U0001f900-\U0001f9ff" u"\u2600-\u26FF"
-        "]+",
-        flags=re.UNICODE,
-    )
-    text = emoji_pattern.sub(r'', text)
-
-    # 6. Remove special characters, keeping only alphanumeric and basic punctuation
-    text = re.sub(r'[^\w\s\'\.\?,!:]', '', text)
-    
-    # 7. Normalize whitespace
+    # 5. Normalize whitespace
     text = re.sub(r'\s+', ' ', text).strip()
-    
-    # 8. Convert to lowercase
-    text = text.lower()
     
     return text

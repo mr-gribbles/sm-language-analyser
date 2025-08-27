@@ -36,22 +36,22 @@ def main():
                        help='Maximum n-gram size (default: 3)')
     
     # Training configuration (enhanced defaults)
-    parser.add_argument('--epochs', type=int, default=150,
-                       help='Maximum number of training epochs (default: 150)')
+    parser.add_argument('--epochs', type=int, default=200,
+                       help='Maximum number of training epochs (default: 200)')
     parser.add_argument('--batch-size', type=int, default=32,
                        help='Training batch size (default: 32)')
-    parser.add_argument('--learning-rate', type=float, default=0.001,
-                       help='Learning rate (default: 0.001)')
-    parser.add_argument('--patience', type=int, default=15,
-                       help='Early stopping patience (default: 15)')
+    parser.add_argument('--learning-rate', type=float, default=0.0001,
+                       help='Learning rate (default: 0.0001)')
+    parser.add_argument('--patience', type=int, default=25,
+                       help='Early stopping patience (default: 25)')
     parser.add_argument('--test-size', type=float, default=0.2,
                        help='Proportion of data for testing (default: 0.2)')
     parser.add_argument('--validation-size', type=float, default=0.15,
                        help='Proportion of training data for validation (default: 0.15)')
     
     # Enhanced regularization options
-    parser.add_argument('--dropout', type=float, default=0.3,
-                       help='Dropout rate (default: 0.3)')
+    parser.add_argument('--dropout', type=float, default=0.4,
+                       help='Dropout rate (default: 0.4)')
     parser.add_argument('--weight-decay', type=float, default=1e-4,
                        help='Weight decay for regularization (default: 1e-4)')
     

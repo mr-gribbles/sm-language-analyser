@@ -25,6 +25,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+# Download VADER lexicon if not already present
+try:
+    import nltk
+    nltk.data.find('sentiment/vader_lexicon.zip')
+except nltk.downloader.DownloadError:
+    nltk.download('vader_lexicon')
 
 
 class EnhancedTextClassifierNetwork(nn.Module):
@@ -123,6 +131,7 @@ class EnhancedAIHumanTextClassifier:
         self.scaler = None
         self.model = None
         self.feature_names = None
+        self.sentiment_analyzer = SentimentIntensityAnalyzer()
         # Use MPS (Metal Performance Shaders) for M1/M2/M3/M4 Macs
         if torch.backends.mps.is_available():
             self.device = torch.device('mps')
@@ -185,6 +194,13 @@ class EnhancedAIHumanTextClassifier:
             unique_bigrams = set(bigrams)
             text_features.append(len(unique_bigrams) / len(bigrams) if len(bigrams) > 0 else 0)  # Bigram diversity
             
+            # Sentiment analysis features
+            sentiment = self.sentiment_analyzer.polarity_scores(text)
+            text_features.append(sentiment['compound'])
+            text_features.append(sentiment['neg'])
+            text_features.append(sentiment['neu'])
+            text_features.append(sentiment['pos'])
+
             features.append(text_features)
         
         return np.array(features)
@@ -382,7 +398,7 @@ class EnhancedAIHumanTextClassifier:
         optimizer = optim.AdamW(self.model.parameters(), lr=learning_rate, weight_decay=weight_decay, 
                                betas=(0.9, 0.999), eps=1e-8)
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
-        
+
         print(f"Enhanced model built with {features_scaled.shape[1]} input features")
         print(f"Using device: {self.device}")
         
@@ -454,7 +470,7 @@ class EnhancedAIHumanTextClassifier:
             
             # Learning rate scheduling
             scheduler.step()
-            
+
             # Early stopping
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
