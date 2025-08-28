@@ -286,3 +286,7 @@ def compare_and_analyze(human_file: str, ai_file: str):
     influential_features = best_classifier.get_influential_features()
     print("\nTop 20 Most Influential Language Features:")
     print(influential_features.to_string(index=False))
+
+    # Save the best model for future analysis
+    model_save_path = Path('models') / 'best_model.pkl'
+    best_classifier.save(str(model_save_path))

@@ -21,15 +21,15 @@ from src.ml.interpretable_classifiers import InterpretableTextClassifier
 
 def analyze_feature_categories(classifier, save_path=None):
     """Analyze features by category and create comprehensive visualizations."""
-    if classifier.all_feature_names is None:
+    if classifier.feature_names_ is None:
         raise ValueError("Model not trained yet")
     
     # Get all features with importance scores
-    top_features = classifier.get_top_features(n_features=50)
+    top_features = classifier.get_influential_features(n_features=50)
     
     # Separate linguistic and word features
-    linguistic_features = top_features[top_features['feature_type'] == 'Linguistic'].copy()
-    word_features = top_features[top_features['feature_type'] == 'Word/N-gram'].copy()
+    linguistic_features = top_features[top_features['type'] == 'linguistic'].copy()
+    word_features = top_features[top_features['type'] == 'n-gram'].copy()
     
     # Clean feature names
     linguistic_features['clean_name'] = linguistic_features['feature'].str.replace('ling_', '')
@@ -288,10 +288,7 @@ def main():
     
     # Model loading
     parser.add_argument('--model-path', type=str, required=True,
-                       help='Path to trained interpretable model')
-    parser.add_argument('--classifier-type', type=str, required=True,
-                       choices=['logistic_regression', 'decision_tree', 'random_forest', 'naive_bayes', 'ridge'],
-                       help='Type of classifier to load')
+                       help='Path to the saved .pkl model file.')
     
     # Analysis options
     parser.add_argument('--top-features', type=int, default=50,
@@ -314,12 +311,10 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Load the trained model
-    print(f"Loading {args.classifier_type} model from {args.model_path}...")
-    
-    classifier = InterpretableTextClassifier(classifier_type=args.classifier_type)
+    print(f"Loading model from {args.model_path}...")
     
     try:
-        classifier.load_model(args.model_path)
+        classifier = InterpretableTextClassifier.load(args.model_path)
         print("Model loaded successfully!")
     except Exception as e:
         print(f"Error loading model: {e}")
@@ -335,7 +330,7 @@ def main():
     if args.generate_report:
         print("Generating comprehensive report...")
         report_path = output_dir / args.report_file
-        report = generate_pattern_report(analysis, args.classifier_type, save_path=report_path)
+        report = generate_pattern_report(analysis, classifier.classifier_type, save_path=report_path)
         print("\n" + report)
     
     # Print summary
