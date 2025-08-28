@@ -11,8 +11,13 @@ import uuid
 from datetime import datetime, timezone
 
 
-def create_corpus_record(source_details, original_content, rewritten_text=None,
-                         llm_model=None, prompt_template=None):
+def create_corpus_record(
+    source_details,
+    original_content,
+    rewritten_text=None,
+    llm_model=None,
+    prompt_template=None,
+):
     """Structure collected data into the official corpus JSON format.
 
     Args:

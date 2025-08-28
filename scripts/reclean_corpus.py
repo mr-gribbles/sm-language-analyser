@@ -15,7 +15,7 @@ from datetime import datetime
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.core_logic.data_cleaner import clean_text
+from src.core.data_cleaner import clean_text
 
 def reclean_corpus(input_file: str, output_file: str):
     """
@@ -25,7 +25,7 @@ def reclean_corpus(input_file: str, output_file: str):
         input_file: Path to the input JSONL file.
         output_file: Path to the output JSONL file.
     """
-    print(f"Starting re-cleaning process for '{input_file}'...")
+    print(f"Re-cleaning corpus: {input_file}")
     
     record_count = 0
     with open(input_file, 'r', encoding='utf-8') as infile, \

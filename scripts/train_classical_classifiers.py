@@ -72,20 +72,14 @@ def main():
         print(f"Error: AI text file '{args.ai_file}' does not exist.")
         sys.exit(1)
     
-    print("=== Classical ML Classifiers Training ===")
-    print(f"Human text file: {args.human_file}")
-    print(f"AI text file: {args.ai_file}")
-    print(f"Classifier: {args.classifier}")
-    print(f"Model save path: {args.model_path}")
-    print(f"Max features: {args.max_features}")
-    print(f"N-gram range: ({args.ngram_min}, {args.ngram_max})")
-    print(f"Hyperparameter tuning: {not args.no_hyperparameter_tuning}")
-    print("=" * 60)
+    print(f"Training {args.classifier} classifier")
+    print(f"Human file: {args.human_file}")
+    print(f"AI file: {args.ai_file}")
     
     try:
         if args.classifier == 'all':
             # Compare all classifiers
-            print("Training and comparing all classical classifiers...")
+            print("Comparing all classifiers")
             results = compare_classifiers(
                 human_file=args.human_file,
                 ai_file=args.ai_file,
@@ -103,8 +97,8 @@ def main():
                     best_classifier = classifier_type
             
             if best_classifier:
-                print(f"\nBest performing classifier: {best_classifier} (accuracy: {best_accuracy:.4f})")
-                print(f"Training and saving best classifier...")
+                print(f"Best classifier: {best_classifier} (accuracy: {best_accuracy:.4f})")
+                print("Training best classifier")
                 
                 classifier = ClassicalTextClassifier(
                     classifier_type=best_classifier,
@@ -147,7 +141,7 @@ def main():
             )
             
             # Save the model
-            print(f"\nSaving {args.classifier} model to {args.model_path}...")
+            print(f"Saving model to {args.model_path}")
             classifier.save_model(args.model_path)
             
             # Save plots if requested
@@ -157,10 +151,8 @@ def main():
                 confusion_path = plot_dir / f"confusion_matrix_{args.classifier}.png"
                 classifier.plot_confusion_matrix(result['confusion_matrix'], str(confusion_path))
             
-            # Print final summary
-            print("\n" + "=" * 60)
-            print("CLASSICAL TRAINING COMPLETE")
-            print("=" * 60)
+            # Print results
+            print("Training complete")
             print(f"Classifier: {args.classifier}")
             print(f"Cross-validation accuracy: {result['cv_mean']:.4f} (+/- {result['cv_std'] * 2:.4f})")
             print(f"Test accuracy: {result['test_accuracy']:.4f}")
@@ -174,22 +166,6 @@ def main():
             
             if args.save_plots:
                 print(f"Plots saved to: {args.plot_dir}")
-            
-            # Performance analysis
-            if result['test_accuracy'] >= 0.90:
-                print("🎉 EXCELLENT: Model achieved 90%+ accuracy!")
-            elif result['test_accuracy'] >= 0.85:
-                print("✅ GOOD: Model achieved target accuracy of 85%+")
-            elif result['test_accuracy'] >= 0.80:
-                print("⚠️  FAIR: Model achieved 80%+ accuracy")
-            else:
-                print("❌ POOR: Model accuracy is below 80%")
-                print("   Consider: collecting more data, feature engineering, or trying ensemble methods")
-            
-            print(f"\nNext steps:")
-            print(f"1. Test the model: python scripts/predict_text.py --model-path {args.model_path} --classifier-type {args.classifier} --interactive")
-            print(f"2. Compare with neural network performance")
-            print(f"3. Try ensemble methods for potentially better performance")
     
     except Exception as e:
         print(f"Error during training: {e}")

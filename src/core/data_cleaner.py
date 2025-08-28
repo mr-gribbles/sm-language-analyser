@@ -29,7 +29,10 @@ def clean_text(raw_text: str) -> str:
     """
     if not isinstance(raw_text, str):
         # Raise an exception if the input is not a string
-        raise TypeError(f"Invalid input to clean_text: expected a string, but got {type(raw_text).__name__}.")
+        raise TypeError(
+            f"Invalid input to clean_text: expected a string, "
+            f"but got {type(raw_text).__name__}."
+        )
         
     # 1. Use BeautifulSoup to remove any potential HTML tags
     soup = BeautifulSoup(raw_text, "html.parser")

@@ -15,7 +15,7 @@ import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core_logic.corpus_analyzer import run_full_analysis
+from src.core.corpus_analyzer import run_full_analysis
 
 
 def analyze_corpus_file(filepath: str):
@@ -65,7 +65,7 @@ def analyze_corpus_file(filepath: str):
         
         df = pd.DataFrame(results)
         
-        print(f"\n--- Corpus Analysis Summary ({analysis_type}) ---")
+        print(f"Analysis complete ({analysis_type})")
         numeric_df = df.select_dtypes(include='number')
         summary = numeric_df.mean().round(3)
         print(summary.to_string())

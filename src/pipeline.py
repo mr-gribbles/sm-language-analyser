@@ -7,9 +7,9 @@ Bluesky platforms.
 import time
 from datetime import datetime, timezone
 from src import config
-from src.core_logic.data_cleaner import clean_text
-from src.core_logic.llm_rewriter import rewrite_text_with_gemini
-from src.core_logic.corpus_manager import (
+from src.core.data_cleaner import clean_text
+from src.core.llm_rewriter import rewrite_text_with_gemini
+from src.core.corpus_manager import (
     create_corpus_record,
     save_record_to_corpus,
 )
@@ -17,8 +17,13 @@ from src.scrapers.reddit_scraper import get_random_text_post
 from src.scrapers.bluesky_scraper import fetch_bluesky_timeline_page
 
 
-def run_pipeline(platform: str, rewrite: bool, num_posts: int = None,
-                 reddit_limit: int = None, bluesky_limit: int = None):
+def run_pipeline(
+    platform: str,
+    rewrite: bool,
+    num_posts: int = None,
+    reddit_limit: int = None,
+    bluesky_limit: int = None,
+):
     """Run the data collection and processing pipeline for the specified platform.
 
     Args:
@@ -39,22 +44,30 @@ def run_pipeline(platform: str, rewrite: bool, num_posts: int = None,
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
     output_filename = f"{platform}_{'rewritten' if rewrite else 'original'}_{timestamp}.jsonl"
 
-    print(f"--- Starting {platform.capitalize()} {pipeline_type} Collection Pipeline ---")
-    print(f"Posts to Collect: {num_posts_to_collect}")
-    print(f"Output Directory: {output_dir}")
-    print("-------------------------------------------")
+    print(f"Starting {platform} {pipeline_type.lower()} collection")
+    print(f"Collecting {num_posts_to_collect} posts")
+    print(f"Output: {output_dir}")
 
     if platform == "reddit":
         sample_limit = reddit_limit or config.REDDIT_SAMPLE_LIMIT
-        _run_reddit_pipeline(rewrite, output_dir, output_filename, num_posts_to_collect, sample_limit)
+        _run_reddit_pipeline(
+            rewrite, output_dir, output_filename, num_posts_to_collect, sample_limit
+        )
     elif platform == "bluesky":
         sample_limit = bluesky_limit or config.BLUESKY_SAMPLE_LIMIT
-        _run_bluesky_pipeline(rewrite, output_dir, output_filename, num_posts_to_collect, sample_limit)
+        _run_bluesky_pipeline(
+            rewrite, output_dir, output_filename, num_posts_to_collect, sample_limit
+        )
 
-    print(f"\n--- {platform.capitalize()} {pipeline_type} Pipeline Complete ---")
+    print(f"{platform} collection complete")
 
-def _run_reddit_pipeline(rewrite: bool, output_dir: str, output_filename: str,
-                         num_posts_to_collect: int, sample_limit: int):
+def _run_reddit_pipeline(
+    rewrite: bool,
+    output_dir: str,
+    output_filename: str,
+    num_posts_to_collect: int,
+    sample_limit: int,
+):
     """Run the Reddit-specific data collection pipeline.
 
     Args:
@@ -106,8 +119,13 @@ def _run_reddit_pipeline(rewrite: bool, output_dir: str, output_filename: str,
             print(f"Collected Post {len(collected_ids)}/{num_posts_to_collect}. ID: {post.id}")
         time.sleep(config.SLEEP_TIMER)
 
-def _run_bluesky_pipeline(rewrite: bool, output_dir: str, output_filename: str,
-                          num_posts_to_collect: int, sample_limit: int):
+def _run_bluesky_pipeline(
+    rewrite: bool,
+    output_dir: str,
+    output_filename: str,
+    num_posts_to_collect: int,
+    sample_limit: int,
+):
     """Run the Bluesky-specific data collection pipeline.
 
     Args:

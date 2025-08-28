@@ -12,7 +12,7 @@ import pytest
 # Add the project root to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core_logic.corpus_manager import create_corpus_record
+from src.core.corpus_manager import create_corpus_record
 
 
 @pytest.fixture
