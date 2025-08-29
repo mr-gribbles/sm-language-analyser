@@ -17,6 +17,8 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from .model_serializer import ModelPackage, ModelSerializer
+
 class SequentialClassifierNetwork(nn.Module):
     """LSTM with Attention for text classification using word embeddings."""
     def __init__(self, vocab_size, embedding_dim=128, hidden_dim=256, n_layers=2, dropout=0.6):
@@ -163,7 +165,13 @@ class SequentialTextClassifier:
                 y_test.extend(label.cpu().numpy())
         
         test_predictions = (np.array(test_preds) > 0.5).astype(int)
-        class_report = classification_report(y_test, test_predictions, target_names=['Human', 'AI'], output_dict=True)
+        
+        # Handle edge case where predictions might be perfect
+        try:
+            class_report = classification_report(y_test, test_predictions, target_names=['Human', 'AI'], output_dict=True)
+        except ValueError:
+            # Fallback for perfect predictions
+            class_report = classification_report(y_test, test_predictions, output_dict=True)
         
         return {
             'test_accuracy': accuracy_score(y_test, test_predictions),
@@ -175,30 +183,46 @@ class SequentialTextClassifier:
         }
 
     def save_model(self, model_path: str):
-        """Save the trained model and preprocessing components."""
-        model_path = Path(model_path)
-        model_path.parent.mkdir(parents=True, exist_ok=True)
+        """Save the trained model and preprocessing components using consolidated format."""
+        package = ModelPackage('sequential')
         
-        torch.save({
-            'model_state_dict': self.model.state_dict(),
+        # Add the PyTorch model (ModelSerializer will handle state_dict extraction)
+        package.add_model(self.model)
+        
+        # Add additional components as metadata
+        package.metadata.update({
             'word_to_idx': self.word_to_idx,
             'vocab_size': self.vocab_size,
-            'max_len': self.max_len
-        }, f"{model_path}_sequential_model.pth")
-        print(f"Sequential model saved to {model_path}_sequential_model.pth")
+            'max_len': self.max_len,
+            'model_architecture': 'SequentialClassifierNetwork'
+        })
+        
+        return ModelSerializer.save_model_package(package, model_path)
 
     def load_model(self, model_path: str):
         """Load a trained model and preprocessing components."""
-        model_path = Path(model_path)
-        checkpoint = torch.load(f"{model_path}_sequential_model.pth", map_location=self.device)
-        
-        self.word_to_idx = checkpoint['word_to_idx']
-        self.vocab_size = checkpoint['vocab_size']
-        self.max_len = checkpoint['max_len']
-        
-        self.model = SequentialClassifierNetwork(len(self.word_to_idx)).to(self.device)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        print(f"Sequential model loaded from {model_path}")
+        try:
+            # Try consolidated format first
+            package = ModelSerializer.load_model_package(model_path)
+            
+            self.word_to_idx = package.metadata['word_to_idx']
+            self.vocab_size = package.metadata['vocab_size']
+            self.max_len = package.metadata['max_len']
+            
+            self.model = SequentialClassifierNetwork(len(self.word_to_idx)).to(self.device)
+            self.model.load_state_dict(package.model)
+            
+        except (FileNotFoundError, KeyError):
+            # Fallback to legacy format
+            model_path = Path(model_path)
+            checkpoint = torch.load(f"{model_path}_sequential_model.pth", map_location=self.device)
+            
+            self.word_to_idx = checkpoint['word_to_idx']
+            self.vocab_size = checkpoint['vocab_size']
+            self.max_len = checkpoint['max_len']
+            
+            self.model = SequentialClassifierNetwork(len(self.word_to_idx)).to(self.device)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
 
     def plot_confusion_matrix(self, confusion_matrix: np.ndarray, save_path: Optional[str] = None):
         """Plot confusion matrix."""

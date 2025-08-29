@@ -26,6 +26,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 
+from .model_serializer import ModelPackage, ModelSerializer
+
 try:
     from xgboost import XGBClassifier
     XGBOOST_AVAILABLE = True
@@ -468,65 +470,72 @@ class EnsembleTextClassifier:
         return predictions, probabilities
     
     def save_model(self, model_path: str):
-        """Save the trained model and preprocessing components."""
+        """Save the trained model and preprocessing components using consolidated format."""
         if self.model is None:
             raise ValueError("No model to save. Train the model first.")
         
-        model_path = Path(model_path)
-        model_path.parent.mkdir(parents=True, exist_ok=True)
+        package = ModelPackage('ensemble')
         
-        # Save model
-        joblib.dump(self.model, f"{model_path}_{self.ensemble_type}_ensemble_model.pkl")
+        # Add the sklearn ensemble model
+        package.add_model(self.model)
         
-        # Save preprocessing components
-        with open(f"{model_path}_{self.ensemble_type}_word_vectorizer.pkl", 'wb') as f:
-            pickle.dump(self.word_vectorizer, f)
-            
-        with open(f"{model_path}_{self.ensemble_type}_char_vectorizer.pkl", 'wb') as f:
-            pickle.dump(self.char_vectorizer, f)
+        # Add vectorizers and scaler
+        package.add_word_vectorizer(self.word_vectorizer)
+        package.add_char_vectorizer(self.char_vectorizer)
+        package.add_scaler(self.scaler)
         
-        with open(f"{model_path}_{self.ensemble_type}_scaler.pkl", 'wb') as f:
-            pickle.dump(self.scaler, f)
-        
-        # Save configuration
-        config = {
+        # Add configuration as metadata
+        package.metadata.update({
             'ensemble_type': self.ensemble_type,
             'max_features': self.max_features,
             'ngram_range': self.ngram_range,
-            'use_hyperparameter_tuning': self.use_hyperparameter_tuning
-        }
-        with open(f"{model_path}_{self.ensemble_type}_config.json", 'w') as f:
-            json.dump(config, f, indent=2)
+            'use_hyperparameter_tuning': self.use_hyperparameter_tuning,
+            'model_architecture': 'EnsembleTextClassifier'
+        })
         
-        print(f"{self.ensemble_type.title()} ensemble model saved to {model_path}_{self.ensemble_type}_ensemble_model.pkl")
+        return ModelSerializer.save_model_package(package, model_path)
     
     def load_model(self, model_path: str):
         """Load a trained model and preprocessing components."""
-        model_path = Path(model_path)
-        
-        # Load configuration
-        with open(f"{model_path}_{self.ensemble_type}_config.json", 'r') as f:
-            config = json.load(f)
-        
-        self.ensemble_type = config['ensemble_type']
-        self.max_features = config['max_features']
-        self.ngram_range = config['ngram_range']
-        self.use_hyperparameter_tuning = config['use_hyperparameter_tuning']
-        
-        # Load model
-        self.model = joblib.load(f"{model_path}_{self.ensemble_type}_ensemble_model.pkl")
-        
-        # Load preprocessing components
-        with open(f"{model_path}_{self.ensemble_type}_word_vectorizer.pkl", 'rb') as f:
-            self.word_vectorizer = pickle.load(f)
+        try:
+            # Try consolidated format first
+            package = ModelSerializer.load_model_package(model_path)
             
-        with open(f"{model_path}_{self.ensemble_type}_char_vectorizer.pkl", 'rb') as f:
-            self.char_vectorizer = pickle.load(f)
-        
-        with open(f"{model_path}_{self.ensemble_type}_scaler.pkl", 'rb') as f:
-            self.scaler = pickle.load(f)
-        
-        print(f"{self.ensemble_type.title()} ensemble model loaded from {model_path}")
+            self.ensemble_type = package.metadata['ensemble_type']
+            self.max_features = package.metadata['max_features']
+            self.ngram_range = package.metadata['ngram_range']
+            self.use_hyperparameter_tuning = package.metadata['use_hyperparameter_tuning']
+            
+            self.model = package.model
+            self.word_vectorizer = package.word_vectorizer
+            self.char_vectorizer = package.char_vectorizer
+            self.scaler = package.scaler
+            
+        except (FileNotFoundError, KeyError):
+            # Fallback to legacy format
+            model_path = Path(model_path)
+            
+            # Load configuration
+            with open(f"{model_path}_{self.ensemble_type}_config.json", 'r') as f:
+                config = json.load(f)
+            
+            self.ensemble_type = config['ensemble_type']
+            self.max_features = config['max_features']
+            self.ngram_range = config['ngram_range']
+            self.use_hyperparameter_tuning = config['use_hyperparameter_tuning']
+            
+            # Load model
+            self.model = joblib.load(f"{model_path}_{self.ensemble_type}_ensemble_model.pkl")
+            
+            # Load preprocessing components
+            with open(f"{model_path}_{self.ensemble_type}_word_vectorizer.pkl", 'rb') as f:
+                self.word_vectorizer = pickle.load(f)
+                
+            with open(f"{model_path}_{self.ensemble_type}_char_vectorizer.pkl", 'rb') as f:
+                self.char_vectorizer = pickle.load(f)
+            
+            with open(f"{model_path}_{self.ensemble_type}_scaler.pkl", 'rb') as f:
+                self.scaler = pickle.load(f)
     
     def plot_confusion_matrix(self, confusion_matrix: np.ndarray, save_path: Optional[str] = None):
         """Plot confusion matrix."""

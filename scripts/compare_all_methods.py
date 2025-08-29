@@ -19,6 +19,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.ml.text_classifier import EnhancedAIHumanTextClassifier
 from src.ml.classical_classifiers import ClassicalTextClassifier
 from src.ml.ensemble_classifiers import EnsembleTextClassifier
+from src.ml.sequential_classifier import SequentialTextClassifier
+from src.ml.hybrid_classifier import HybridTextClassifier
 
 
 def train_single_method(method_type: str, method_name: str, human_file: str,
@@ -172,6 +174,90 @@ def train_single_method(method_type: str, method_name: str, human_file: str,
             
             return result
             
+        elif method_type == 'sequential':
+            classifier = SequentialTextClassifier(
+                vocab_size=15000 if reduced_features else 20000,
+                max_len=256 if reduced_features else 512
+            )
+            
+            result = classifier.train_from_files(
+                human_file=human_file,
+                ai_file=ai_file,
+                test_size=test_size,
+                validation_size=validation_size,
+                epochs=30 if reduced_features else 50
+            )
+            
+            training_time = time.time() - start_time
+            
+            # Save model automatically
+            if save_model and model_save_path and classifier:
+                try:
+                    model_path = f"{model_save_path}_{method_name}"
+                    classifier.save_model(model_path)
+                    print(f"Saved sequential model to {model_path}")
+                except Exception as e:
+                    print(f"Failed to save sequential model: {e}")
+            
+            return {
+                'method': f'{method_type.title()}: {method_name}',
+                'test_accuracy': result['test_accuracy'],
+                'test_precision': result['test_precision'],
+                'test_recall': result['test_recall'],
+                'test_f1': result['test_f1'],
+                'test_auc': 0.0,  # Sequential classifier doesn't compute AUC
+                'feature_count': 0,  # Sequential uses embeddings, not traditional features
+                'training_time': training_time,
+                'cv_mean': 0.0,  # Sequential doesn't use CV
+                'cv_std': 0.0,
+                'best_params': {},
+                'confusion_matrix': result['confusion_matrix'],
+                'error': None
+            }
+            
+        elif method_type == 'hybrid':
+            classifier = HybridTextClassifier(
+                vocab_size=15000 if reduced_features else 20000,
+                max_len=256 if reduced_features else 512,
+                max_features=8000 if reduced_features else 15000,
+                ngram_range=(1, 2) if reduced_features else (1, 3)
+            )
+            
+            result = classifier.train_from_files(
+                human_file=human_file,
+                ai_file=ai_file,
+                test_size=test_size,
+                validation_size=validation_size,
+                epochs=30 if reduced_features else 50
+            )
+            
+            training_time = time.time() - start_time
+            
+            # Save model automatically
+            if save_model and model_save_path and classifier:
+                try:
+                    model_path = f"{model_save_path}_{method_name}"
+                    classifier.save_model(model_path)
+                    print(f"Saved hybrid model to {model_path}")
+                except Exception as e:
+                    print(f"Failed to save hybrid model: {e}")
+            
+            return {
+                'method': f'{method_type.title()}: {method_name}',
+                'test_accuracy': result['test_accuracy'],
+                'test_precision': result['test_precision'],
+                'test_recall': result['test_recall'],
+                'test_f1': result['test_f1'],
+                'test_auc': 0.0,  # Hybrid classifier doesn't compute AUC
+                'feature_count': 0,  # Hybrid uses both embeddings and features
+                'training_time': training_time,
+                'cv_mean': 0.0,  # Hybrid doesn't use CV
+                'cv_std': 0.0,
+                'best_params': {},
+                'confusion_matrix': result['confusion_matrix'],
+                'error': None
+            }
+            
     except Exception as e:
         training_time = time.time() - start_time
         return {
@@ -215,6 +301,10 @@ def main():
                        help='Skip classical ML methods')
     parser.add_argument('--skip-ensemble', action='store_true',
                        help='Skip ensemble methods')
+    parser.add_argument('--skip-sequential', action='store_true',
+                       help='Skip sequential (LSTM) classifier training')
+    parser.add_argument('--skip-hybrid', action='store_true',
+                       help='Skip hybrid classifier training')
     
     # Classical ML methods to test
     parser.add_argument('--classical-methods', nargs='+', 
@@ -279,6 +369,12 @@ def main():
     if not args.skip_ensemble:
         for method in args.ensemble_methods:
             methods_to_test.append(('ensemble', method))
+    
+    if not args.skip_sequential:
+        methods_to_test.append(('sequential', 'lstm_attention'))
+    
+    if not args.skip_hybrid:
+        methods_to_test.append(('hybrid', 'lstm_features'))
     
     # Limit methods if specified
     if args.max_methods and len(methods_to_test) > args.max_methods:
@@ -392,6 +488,8 @@ def main():
             neural_results = [v for k, v in successful_results.items() if 'neural' in k.lower()]
             classical_results = [v for k, v in successful_results.items() if 'classical' in k.lower()]
             ensemble_results = [v for k, v in successful_results.items() if 'ensemble' in k.lower()]
+            sequential_results = [v for k, v in successful_results.items() if 'sequential' in k.lower()]
+            hybrid_results = [v for k, v in successful_results.items() if 'hybrid' in k.lower()]
             
             print("\nMETHOD FAMILY ANALYSIS:")
             if neural_results:
@@ -405,6 +503,14 @@ def main():
             if ensemble_results:
                 avg_ensemble = sum(r.get('test_accuracy', 0) for r in ensemble_results) / len(ensemble_results)
                 print(f"Ensemble Methods: {len(ensemble_results)} methods, avg accuracy: {avg_ensemble:.4f}")
+            
+            if sequential_results:
+                avg_sequential = sum(r.get('test_accuracy', 0) for r in sequential_results) / len(sequential_results)
+                print(f"Sequential (LSTM): {len(sequential_results)} methods, avg accuracy: {avg_sequential:.4f}")
+            
+            if hybrid_results:
+                avg_hybrid = sum(r.get('test_accuracy', 0) for r in hybrid_results) / len(hybrid_results)
+                print(f"Hybrid Models: {len(hybrid_results)} methods, avg accuracy: {avg_hybrid:.4f}")
         
         else:
             print("No methods completed successfully")

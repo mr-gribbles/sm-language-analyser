@@ -27,6 +27,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
+from .model_serializer import ModelPackage, ModelSerializer
+
 # Download VADER lexicon if not already present
 try:
     import nltk
@@ -559,65 +561,47 @@ class EnhancedAIHumanTextClassifier:
         return predictions, probabilities
     
     def save_model(self, model_path: str):
-        """Save the trained model and preprocessing components."""
+        """Save the trained model and preprocessing components to a single consolidated file."""
         if self.model is None:
             raise ValueError("No model to save. Train the model first.")
         
-        model_path = Path(model_path)
-        model_path.parent.mkdir(parents=True, exist_ok=True)
+        # Create model package
+        package = ModelPackage('enhanced')
+        package.add_model(self.model)
+        package.add_word_vectorizer(self.word_vectorizer)
+        package.add_char_vectorizer(self.char_vectorizer)
+        package.add_scaler(self.scaler)
         
-        # Save PyTorch model
-        torch.save({
-            'model_state_dict': self.model.state_dict(),
-            'model_config': {
-                'input_dim': self.model.input_layer.in_features,
-                'max_features': self.max_features,
-                'ngram_range': self.ngram_range
-            }
-        }, f"{model_path}_enhanced_model.pth")
+        # Add configuration
+        config = {
+            'input_dim': self.model.input_layer.in_features,
+            'max_features': self.max_features,
+            'ngram_range': self.ngram_range
+        }
+        package.add_config(config)
         
-        # Save preprocessing components
-        with open(f"{model_path}_word_vectorizer.pkl", 'wb') as f:
-            pickle.dump(self.word_vectorizer, f)
-            
-        with open(f"{model_path}_char_vectorizer.pkl", 'wb') as f:
-            pickle.dump(self.char_vectorizer, f)
-        
-        with open(f"{model_path}_scaler.pkl", 'wb') as f:
-            pickle.dump(self.scaler, f)
-        
-        print(f"Enhanced model saved to {model_path}_enhanced_model.pth")
-        print(f"Word vectorizer saved to {model_path}_word_vectorizer.pkl")
-        print(f"Character vectorizer saved to {model_path}_char_vectorizer.pkl")
-        print(f"Scaler saved to {model_path}_scaler.pkl")
+        # Save consolidated package
+        return ModelSerializer.save_model_package(package, model_path)
     
     def load_model(self, model_path: str):
-        """Load a trained model and preprocessing components."""
-        model_path = Path(model_path)
-        
-        # Load model
-        checkpoint = torch.load(f"{model_path}_enhanced_model.pth", map_location=self.device, weights_only=True)
-        model_config = checkpoint['model_config']
+        """Load a trained model and preprocessing components from a consolidated file."""
+        # Load consolidated package
+        package = ModelSerializer.load_model_package(model_path, self.device)
         
         # Update instance variables from saved config
-        self.max_features = model_config['max_features']
-        self.ngram_range = model_config['ngram_range']
+        self.max_features = package.config['max_features']
+        self.ngram_range = package.config['ngram_range']
         
         # Initialize and load model
-        self.model = EnhancedTextClassifierNetwork(model_config['input_dim']).to(self.device)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model = EnhancedTextClassifierNetwork(package.config['input_dim']).to(self.device)
+        self.model.load_state_dict(package.model)
         
         # Load preprocessing components
-        with open(f"{model_path}_word_vectorizer.pkl", 'rb') as f:
-            self.word_vectorizer = pickle.load(f)
-            
-        with open(f"{model_path}_char_vectorizer.pkl", 'rb') as f:
-            self.char_vectorizer = pickle.load(f)
+        self.word_vectorizer = package.word_vectorizer
+        self.char_vectorizer = package.char_vectorizer
+        self.scaler = package.scaler
         
-        with open(f"{model_path}_scaler.pkl", 'rb') as f:
-            self.scaler = pickle.load(f)
-        
-        print(f"Enhanced model loaded from {model_path}")
+        print(f"Enhanced model loaded from consolidated package: {model_path}")
     
     def plot_training_history(self, history: Dict[str, List[float]], save_path: Optional[str] = None):
         """Plot training history."""

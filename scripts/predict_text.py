@@ -244,70 +244,100 @@ def discover_available_models():
         'hybrid': []
     }
     
-    # Standard model paths
-    neural_path_1 = "models/ai_human_classifier_enhanced"
-    neural_path_2 = "models/comparison_enhanced_neural_network"
-    hybrid_path = "models/ai_human_classifier_hybrid"
-    comparison_path = "models/comparison"
+    models_dir = Path("models")
+    if not models_dir.exists():
+        return available_models
     
-    # Check for neural network (try both possible paths)
-    neural_files_1 = [
-        f"{neural_path_1}_enhanced_model.pth",
-        f"{neural_path_1}_word_vectorizer.pkl",
-        f"{neural_path_1}_char_vectorizer.pkl",
-        f"{neural_path_1}_scaler.pkl"
-    ]
-    neural_files_2 = [
-        f"{neural_path_2}_enhanced_model.pth",
-        f"{neural_path_2}_word_vectorizer.pkl",
-        f"{neural_path_2}_char_vectorizer.pkl",
-        f"{neural_path_2}_scaler.pkl"
-    ]
+    # Check for consolidated models first
+    consolidated_files = list(models_dir.glob("*_consolidated.pkl"))
+    for consolidated_file in consolidated_files:
+        base_name = consolidated_file.stem.replace('_consolidated', '')
+        
+        if 'enhanced' in base_name or 'neural' in base_name:
+            available_models['neural'].append(('enhanced_neural_network', str(consolidated_file.with_suffix(''))))
+        elif 'hybrid' in base_name:
+            available_models['hybrid'].append(('hybrid', str(consolidated_file.with_suffix(''))))
+        elif any(classifier in base_name for classifier in ['random_forest', 'svm', 'logistic_regression', 
+                                                           'gradient_boosting', 'naive_bayes', 'knn', 
+                                                           'decision_tree', 'adaboost']):
+            for classifier_type in ['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
+                                  'naive_bayes', 'knn', 'decision_tree', 'adaboost']:
+                if classifier_type in base_name:
+                    available_models['classical'].append((classifier_type, str(consolidated_file.with_suffix(''))))
+                    break
+        elif any(ensemble in base_name for ensemble in ['voting', 'bagging', 'stacking', 'xgboost', 
+                                                       'lightgbm', 'catboost', 'extra_trees', 'custom_ensemble']):
+            for ensemble_type in ['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
+                                'catboost', 'extra_trees', 'custom_ensemble']:
+                if ensemble_type in base_name:
+                    available_models['ensemble'].append((ensemble_type, str(consolidated_file.with_suffix(''))))
+                    break
     
-    if all(Path(f).exists() for f in neural_files_1):
-        available_models['neural'].append(('enhanced_neural_network', neural_path_1))
-    elif all(Path(f).exists() for f in neural_files_2):
-        available_models['neural'].append(('enhanced_neural_network', neural_path_2))
+    # Fallback to old multi-file format if no consolidated models found
+    if not any(available_models.values()):
+        neural_path_1 = "models/ai_human_classifier_enhanced"
+        neural_path_2 = "models/comparison_enhanced_neural_network"
+        hybrid_path = "models/ai_human_classifier_hybrid"
+        comparison_path = "models/comparison"
+        
+        # Check for neural network (try both possible paths)
+        neural_files_1 = [
+            f"{neural_path_1}_enhanced_model.pth",
+            f"{neural_path_1}_word_vectorizer.pkl",
+            f"{neural_path_1}_char_vectorizer.pkl",
+            f"{neural_path_1}_scaler.pkl"
+        ]
+        neural_files_2 = [
+            f"{neural_path_2}_enhanced_model.pth",
+            f"{neural_path_2}_word_vectorizer.pkl",
+            f"{neural_path_2}_char_vectorizer.pkl",
+            f"{neural_path_2}_scaler.pkl"
+        ]
+        
+        if all(Path(f).exists() for f in neural_files_1):
+            available_models['neural'].append(('enhanced_neural_network', neural_path_1))
+        elif all(Path(f).exists() for f in neural_files_2):
+            available_models['neural'].append(('enhanced_neural_network', neural_path_2))
 
-    # Check for hybrid model
-    hybrid_files = [
-        f"{hybrid_path}_hybrid_model.pth",
-        f"{hybrid_path}_hybrid_word_vectorizer.pkl",
-        f"{hybrid_path}_hybrid_char_vectorizer.pkl",
-        f"{hybrid_path}_hybrid_scaler.pkl"
-    ]
-    if all(Path(f).exists() for f in hybrid_files):
-        available_models['hybrid'].append(('hybrid', hybrid_path))
-    
-    # Check for classical models
-    classical_types = ['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
-                      'naive_bayes', 'knn', 'decision_tree', 'adaboost']
-    
-    for classifier_type in classical_types:
-        classical_files = [
-            f"{comparison_path}_{classifier_type}_{classifier_type}_model.pkl",
-            f"{comparison_path}_{classifier_type}_{classifier_type}_word_vectorizer.pkl",
-            f"{comparison_path}_{classifier_type}_{classifier_type}_char_vectorizer.pkl",
-            f"{comparison_path}_{classifier_type}_{classifier_type}_scaler.pkl",
-            f"{comparison_path}_{classifier_type}_{classifier_type}_config.json"
+        # Check for hybrid model
+        hybrid_files = [
+            f"{hybrid_path}_hybrid_model.pth",
+            f"{hybrid_path}_hybrid_word_vectorizer.pkl",
+            f"{hybrid_path}_hybrid_char_vectorizer.pkl",
+            f"{hybrid_path}_hybrid_scaler.pkl"
         ]
-        if all(Path(f).exists() for f in classical_files):
-            available_models['classical'].append((classifier_type, f"{comparison_path}_{classifier_type}"))
-    
-    # Check for ensemble models
-    ensemble_types = ['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
-                     'catboost', 'extra_trees', 'custom_ensemble']
-    
-    for ensemble_type in ensemble_types:
-        ensemble_files = [
-            f"{comparison_path}_{ensemble_type}_{ensemble_type}_ensemble_model.pkl",
-            f"{comparison_path}_{ensemble_type}_{ensemble_type}_word_vectorizer.pkl",
-            f"{comparison_path}_{ensemble_type}_{ensemble_type}_char_vectorizer.pkl",
-            f"{comparison_path}_{ensemble_type}_{ensemble_type}_scaler.pkl",
-            f"{comparison_path}_{ensemble_type}_{ensemble_type}_config.json"
-        ]
-        if all(Path(f).exists() for f in ensemble_files):
-            available_models['ensemble'].append((ensemble_type, f"{comparison_path}_{ensemble_type}"))
+        if all(Path(f).exists() for f in hybrid_files):
+            available_models['hybrid'].append(('hybrid', hybrid_path))
+        
+        # Check for classical models
+        classical_types = ['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
+                          'naive_bayes', 'knn', 'decision_tree', 'adaboost']
+        
+        for classifier_type in classical_types:
+            classical_files = [
+                f"{comparison_path}_{classifier_type}_{classifier_type}_model.pkl",
+                f"{comparison_path}_{classifier_type}_{classifier_type}_word_vectorizer.pkl",
+                f"{comparison_path}_{classifier_type}_{classifier_type}_char_vectorizer.pkl",
+                f"{comparison_path}_{classifier_type}_{classifier_type}_scaler.pkl",
+                f"{comparison_path}_{classifier_type}_{classifier_type}_config.json"
+            ]
+            if all(Path(f).exists() for f in classical_files):
+                available_models['classical'].append((classifier_type, f"{comparison_path}_{classifier_type}"))
+        
+        # Check for ensemble models
+        ensemble_types = ['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
+                         'catboost', 'extra_trees', 'custom_ensemble']
+        
+        for ensemble_type in ensemble_types:
+            ensemble_files = [
+                f"{comparison_path}_{ensemble_type}_{ensemble_type}_ensemble_model.pkl",
+                f"{comparison_path}_{ensemble_type}_{ensemble_type}_word_vectorizer.pkl",
+                f"{comparison_path}_{ensemble_type}_{ensemble_type}_char_vectorizer.pkl",
+                f"{comparison_path}_{ensemble_type}_{ensemble_type}_scaler.pkl",
+                f"{comparison_path}_{ensemble_type}_{ensemble_type}_config.json"
+            ]
+            if all(Path(f).exists() for f in ensemble_files):
+                available_models['ensemble'].append((ensemble_type, f"{comparison_path}_{ensemble_type}"))
     
     return available_models
 
@@ -787,36 +817,58 @@ def main():
     # Set default model paths if not provided
     if args.model_path is None:
         if args.neural:
-            args.model_path = "models/ai_human_classifier_enhanced"
+            # Check for consolidated model first
+            consolidated_path = "models/ai_human_classifier_enhanced_consolidated"
+            if Path(f"{consolidated_path}.pkl").exists():
+                args.model_path = consolidated_path
+            else:
+                args.model_path = "models/ai_human_classifier_enhanced"
         elif args.hybrid:
-            args.model_path = "models/ai_human_classifier_hybrid"
+            consolidated_path = "models/ai_human_classifier_hybrid_consolidated"
+            if Path(f"{consolidated_path}.pkl").exists():
+                args.model_path = consolidated_path
+            else:
+                args.model_path = "models/ai_human_classifier_hybrid"
         elif args.classical:
-            args.model_path = f"models/comparison_{args.classical}"
+            consolidated_path = f"models/comparison_{args.classical}_{args.classical}_consolidated"
+            if Path(f"{consolidated_path}.pkl").exists():
+                args.model_path = consolidated_path
+            else:
+                args.model_path = f"models/comparison_{args.classical}"
         elif args.ensemble:
-            args.model_path = f"models/comparison_{args.ensemble}"
+            consolidated_path = f"models/comparison_{args.ensemble}_{args.ensemble}_consolidated"
+            if Path(f"{consolidated_path}.pkl").exists():
+                args.model_path = consolidated_path
+            else:
+                args.model_path = f"models/comparison_{args.ensemble}"
     
     # Determine model type and load appropriate classifier
     try:
         if args.neural:
-            # Check neural network files
-            model_path = Path(args.model_path)
-            required_files = [
-                f"{model_path}_enhanced_model.pth",
-                f"{model_path}_word_vectorizer.pkl",
-                f"{model_path}_char_vectorizer.pkl",
-                f"{model_path}_scaler.pkl"
-            ]
-            
-            missing_files = [f for f in required_files if not Path(f).exists()]
-            if missing_files:
-                print("Error: Neural network model files not found:")
-                for f in missing_files:
-                    print(f"  - {f}")
-                print(f"\nTrain a neural network model first using:")
-                print(f"  python scripts/train_classifier.py --human-file <file> --ai-file <file> --model-path {args.model_path}")
-                sys.exit(1)
-            
-            classifier, model_type = load_neural_network(args.model_path)
+            # Check for consolidated model first, then fallback to multi-file
+            consolidated_path = f"{args.model_path}.pkl"
+            if Path(consolidated_path).exists():
+                classifier, model_type = load_neural_network(args.model_path)
+            else:
+                # Check neural network files
+                model_path = Path(args.model_path)
+                required_files = [
+                    f"{model_path}_enhanced_model.pth",
+                    f"{model_path}_word_vectorizer.pkl",
+                    f"{model_path}_char_vectorizer.pkl",
+                    f"{model_path}_scaler.pkl"
+                ]
+                
+                missing_files = [f for f in required_files if not Path(f).exists()]
+                if missing_files:
+                    print("Error: Neural network model files not found:")
+                    for f in missing_files:
+                        print(f"  - {f}")
+                    print(f"\nTrain a neural network model first using:")
+                    print(f"  python scripts/train_classifier.py --human-file <file> --ai-file <file> --model-path {args.model_path}")
+                    sys.exit(1)
+                
+                classifier, model_type = load_neural_network(args.model_path)
 
         elif args.hybrid:
             # Check hybrid model files

@@ -20,6 +20,8 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from .model_serializer import ModelPackage, ModelSerializer
+
 class HybridClassifierNetwork(nn.Module):
     """Hybrid model with LSTM for sequence and a feed-forward network for features."""
     def __init__(self, vocab_size, n_features, embedding_dim=128, hidden_dim=256, n_layers=2, dropout=0.5):
@@ -216,7 +218,13 @@ class HybridTextClassifier:
                 y_test.extend(label.cpu().numpy())
         
         test_predictions = (np.array(test_preds) > 0.5).astype(int)
-        class_report = classification_report(y_test, test_predictions, target_names=['Human', 'AI'], output_dict=True)
+        
+        # Handle edge case where predictions might be perfect
+        try:
+            class_report = classification_report(y_test, test_predictions, target_names=['Human', 'AI'], output_dict=True)
+        except ValueError:
+            # Fallback for perfect predictions
+            class_report = classification_report(y_test, test_predictions, output_dict=True)
         
         return {
             'test_accuracy': accuracy_score(y_test, test_predictions),
@@ -228,47 +236,65 @@ class HybridTextClassifier:
         }
 
     def save_model(self, model_path: str):
-        model_path = Path(model_path)
-        model_path.parent.mkdir(parents=True, exist_ok=True)
+        """Save the trained model and preprocessing components using consolidated format."""
+        package = ModelPackage('hybrid')
         
-        torch.save({
-            'model_state_dict': self.model.state_dict(),
+        # Add the PyTorch model (ModelSerializer will handle state_dict extraction)
+        package.add_model(self.model)
+        
+        # Add vectorizers and scaler
+        package.add_word_vectorizer(self.word_vectorizer)
+        package.add_char_vectorizer(self.char_vectorizer)
+        package.add_scaler(self.scaler)
+        
+        # Add additional components as metadata
+        package.metadata.update({
             'word_to_idx': self.word_to_idx,
             'vocab_size': self.vocab_size,
             'max_len': self.max_len,
             'n_features': self.n_features,
-        }, f"{model_path}_hybrid_model.pth")
+            'model_architecture': 'HybridClassifierNetwork'
+        })
         
-        with open(f"{model_path}_hybrid_word_vectorizer.pkl", 'wb') as f:
-            pickle.dump(self.word_vectorizer, f)
-        with open(f"{model_path}_hybrid_char_vectorizer.pkl", 'wb') as f:
-            pickle.dump(self.char_vectorizer, f)
-        with open(f"{model_path}_hybrid_scaler.pkl", 'wb') as f:
-            pickle.dump(self.scaler, f)
-            
-        print(f"Hybrid model saved to {model_path}_hybrid_model.pth")
+        return ModelSerializer.save_model_package(package, model_path)
 
     def load_model(self, model_path: str):
         """Load a trained model and preprocessing components."""
-        model_path = Path(model_path)
-        checkpoint = torch.load(f"{model_path}_hybrid_model.pth", map_location=self.device, weights_only=True)
-        
-        self.word_to_idx = checkpoint['word_to_idx']
-        self.vocab_size = checkpoint['vocab_size']
-        self.max_len = checkpoint['max_len']
-        self.n_features = checkpoint['n_features']
-        
-        self.model = HybridClassifierNetwork(len(self.word_to_idx), self.n_features).to(self.device)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        
-        with open(f"{model_path}_hybrid_word_vectorizer.pkl", 'rb') as f:
-            self.word_vectorizer = pickle.load(f)
-        with open(f"{model_path}_hybrid_char_vectorizer.pkl", 'rb') as f:
-            self.char_vectorizer = pickle.load(f)
-        with open(f"{model_path}_hybrid_scaler.pkl", 'rb') as f:
-            self.scaler = pickle.load(f)
+        try:
+            # Try consolidated format first
+            package = ModelSerializer.load_model_package(model_path)
             
-        print(f"Hybrid model loaded from {model_path}")
+            self.word_to_idx = package.metadata['word_to_idx']
+            self.vocab_size = package.metadata['vocab_size']
+            self.max_len = package.metadata['max_len']
+            self.n_features = package.metadata['n_features']
+            
+            self.model = HybridClassifierNetwork(len(self.word_to_idx), self.n_features).to(self.device)
+            self.model.load_state_dict(package.model)
+            
+            self.word_vectorizer = package.word_vectorizer
+            self.char_vectorizer = package.char_vectorizer
+            self.scaler = package.scaler
+            
+        except (FileNotFoundError, KeyError):
+            # Fallback to legacy format
+            model_path = Path(model_path)
+            checkpoint = torch.load(f"{model_path}_hybrid_model.pth", map_location=self.device, weights_only=True)
+            
+            self.word_to_idx = checkpoint['word_to_idx']
+            self.vocab_size = checkpoint['vocab_size']
+            self.max_len = checkpoint['max_len']
+            self.n_features = checkpoint['n_features']
+            
+            self.model = HybridClassifierNetwork(len(self.word_to_idx), self.n_features).to(self.device)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            
+            with open(f"{model_path}_hybrid_word_vectorizer.pkl", 'rb') as f:
+                self.word_vectorizer = pickle.load(f)
+            with open(f"{model_path}_hybrid_char_vectorizer.pkl", 'rb') as f:
+                self.char_vectorizer = pickle.load(f)
+            with open(f"{model_path}_hybrid_scaler.pkl", 'rb') as f:
+                self.scaler = pickle.load(f)
 
     def predict(self, texts: List[str]) -> Tuple[np.ndarray, np.ndarray]:
         """Predict whether texts are AI-generated or human-written."""
