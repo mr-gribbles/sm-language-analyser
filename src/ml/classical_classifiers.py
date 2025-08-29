@@ -12,6 +12,8 @@ import re
 
 import numpy as np
 import pandas as pd
+import warnings
+from contextlib import contextmanager
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import StandardScaler
@@ -27,6 +29,25 @@ import seaborn as sns
 import joblib
 
 from .model_serializer import ModelPackage, ModelSerializer
+
+
+@contextmanager
+def suppress_sklearn_warnings():
+    """Context manager to suppress specific sklearn numerical warnings."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning, 
+                              message='.*divide by zero encountered in matmul.*')
+        warnings.filterwarnings('ignore', category=RuntimeWarning, 
+                              message='.*overflow encountered in matmul.*')
+        warnings.filterwarnings('ignore', category=RuntimeWarning, 
+                              message='.*invalid value encountered in matmul.*')
+        warnings.filterwarnings('ignore', category=RuntimeWarning, 
+                              message='.*divide by zero encountered.*')
+        warnings.filterwarnings('ignore', category=RuntimeWarning, 
+                              message='.*overflow encountered.*')
+        warnings.filterwarnings('ignore', category=RuntimeWarning, 
+                              message='.*invalid value encountered.*')
+        yield
 
 
 class ClassicalTextClassifier:
@@ -54,59 +75,99 @@ class ClassicalTextClassifier:
         self.feature_names = None
         
     def extract_linguistic_features(self, texts: List[str]) -> np.ndarray:
-        """Extract linguistic features from texts (same as neural network version)."""
+        """Extract linguistic features from texts with numerical stability fixes."""
         features = []
         
         for text in texts:
             text_features = []
             
-            # Basic statistics
-            text_features.append(len(text))  # Text length
-            text_features.append(len(text.split()))  # Word count
-            text_features.append(len(text.split()) / len(text) if len(text) > 0 else 0)  # Word density
-            
-            # Sentence statistics
-            sentences = text.split('.')
-            text_features.append(len(sentences))  # Sentence count
-            text_features.append(np.mean([len(s.split()) for s in sentences if s.strip()]))  # Avg words per sentence
-            
-            # Character-level features
-            text_features.append(sum(1 for c in text if c.isupper()) / len(text) if len(text) > 0 else 0)  # Uppercase ratio
-            text_features.append(sum(1 for c in text if c.islower()) / len(text) if len(text) > 0 else 0)  # Lowercase ratio
-            text_features.append(sum(1 for c in text if c.isdigit()) / len(text) if len(text) > 0 else 0)  # Digit ratio
-            text_features.append(sum(1 for c in text if c in '.,!?;:') / len(text) if len(text) > 0 else 0)  # Punctuation ratio
-            
-            # Vocabulary complexity
+            # Basic statistics with safe division
+            text_len = len(text)
             words = text.lower().split()
+            word_count = len(words)
+            
+            text_features.append(text_len)  # Text length
+            text_features.append(word_count)  # Word count
+            text_features.append(word_count / max(text_len, 1))  # Word density (safe division)
+            
+            # Sentence statistics with safe operations
+            sentences = [s.strip() for s in text.split('.') if s.strip()]
+            sentence_count = max(len(sentences), 1)  # Avoid division by zero
+            text_features.append(sentence_count)  # Sentence count
+            
+            # Average words per sentence with safe calculation
+            if sentences:
+                sentence_lengths = [len(s.split()) for s in sentences]
+                avg_words_per_sentence = np.mean(sentence_lengths) if sentence_lengths else 0
+            else:
+                avg_words_per_sentence = 0
+            text_features.append(avg_words_per_sentence)
+            
+            # Character-level features with safe division
+            if text_len > 0:
+                text_features.append(sum(1 for c in text if c.isupper()) / text_len)  # Uppercase ratio
+                text_features.append(sum(1 for c in text if c.islower()) / text_len)  # Lowercase ratio
+                text_features.append(sum(1 for c in text if c.isdigit()) / text_len)  # Digit ratio
+                text_features.append(sum(1 for c in text if c in '.,!?;:') / text_len)  # Punctuation ratio
+            else:
+                text_features.extend([0, 0, 0, 0])
+            
+            # Vocabulary complexity with safe division
             unique_words = set(words)
-            text_features.append(len(unique_words) / len(words) if len(words) > 0 else 0)  # Lexical diversity
+            text_features.append(len(unique_words) / max(word_count, 1))  # Lexical diversity (safe division)
             
-            # Average word length
-            text_features.append(np.mean([len(word) for word in words]) if words else 0)
+            # Average word length with safe calculation
+            if words:
+                avg_word_len = np.mean([len(word) for word in words])
+                # Clip extreme values to prevent numerical issues
+                avg_word_len = np.clip(avg_word_len, 0, 50)
+            else:
+                avg_word_len = 0
+            text_features.append(avg_word_len)
             
-            # Readability approximation (Flesch-like)
-            avg_sentence_length = len(words) / len(sentences) if len(sentences) > 0 else 0
-            avg_syllables = np.mean([max(1, len(re.findall(r'[aeiouAEIOU]', word))) for word in words]) if words else 0
+            # Readability approximation (Flesch-like) with safe calculations
+            avg_sentence_length = word_count / sentence_count  # Already safe due to max(1) above
+            if words:
+                syllable_counts = [max(1, len(re.findall(r'[aeiouAEIOU]', word))) for word in words]
+                avg_syllables = np.mean(syllable_counts)
+                # Clip to reasonable range to prevent extreme values
+                avg_syllables = np.clip(avg_syllables, 1, 10)
+            else:
+                avg_syllables = 1
+            
             flesch_score = 206.835 - (1.015 * avg_sentence_length) - (84.6 * avg_syllables)
+            # Clip Flesch score to reasonable range
+            flesch_score = np.clip(flesch_score, -100, 200)
             text_features.append(flesch_score)
             
-            # Function word ratios
+            # Function word ratios with safe division
             function_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'must'}
             function_word_count = sum(1 for word in words if word.lower() in function_words)
-            text_features.append(function_word_count / len(words) if len(words) > 0 else 0)
+            text_features.append(function_word_count / max(word_count, 1))  # Safe division
             
-            # Repetition patterns
-            bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
-            unique_bigrams = set(bigrams)
-            text_features.append(len(unique_bigrams) / len(bigrams) if len(bigrams) > 0 else 0)  # Bigram diversity
+            # Repetition patterns with safe division
+            if len(words) > 1:
+                bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
+                unique_bigrams = set(bigrams)
+                bigram_diversity = len(unique_bigrams) / len(bigrams)
+            else:
+                bigram_diversity = 0
+            text_features.append(bigram_diversity)
             
+            # Ensure all features are finite and not NaN
+            text_features = [np.clip(f, -1e6, 1e6) if np.isfinite(f) else 0 for f in text_features]
             features.append(text_features)
         
-        return np.array(features)
+        feature_array = np.array(features)
+        
+        # Final safety check: replace any remaining NaN or infinite values
+        feature_array = np.nan_to_num(feature_array, nan=0.0, posinf=1e6, neginf=-1e6)
+        
+        return feature_array
     
     def extract_features(self, texts: List[str]) -> np.ndarray:
-        """Extract comprehensive features (same as neural network version)."""
-        # Word-level TF-IDF features
+        """Extract comprehensive features with numerical stability improvements."""
+        # Word-level TF-IDF features with more conservative settings
         if self.word_vectorizer is None:
             self.word_vectorizer = TfidfVectorizer(
                 max_features=self.max_features // 2,
@@ -115,8 +176,8 @@ class ClassicalTextClassifier:
                 lowercase=True,
                 strip_accents='unicode',
                 token_pattern=r'\b[a-zA-Z]{2,}\b',
-                min_df=3,
-                max_df=0.85,
+                min_df=5,  # Increased from 3 to reduce noise
+                max_df=0.8,  # Reduced from 0.85 to filter common terms
                 sublinear_tf=True,
                 use_idf=True,
                 smooth_idf=True,
@@ -126,15 +187,15 @@ class ClassicalTextClassifier:
         else:
             word_features = self.word_vectorizer.transform(texts).toarray()
         
-        # Character-level TF-IDF features
+        # Character-level TF-IDF features with more conservative settings
         if self.char_vectorizer is None:
             self.char_vectorizer = TfidfVectorizer(
                 max_features=self.max_features // 2,
                 analyzer='char',
-                ngram_range=(2, 5),
+                ngram_range=(2, 4),  # Reduced from (2, 5) to reduce complexity
                 lowercase=True,
-                min_df=5,
-                max_df=0.9,
+                min_df=10,  # Increased from 5 to reduce noise
+                max_df=0.85,  # Reduced from 0.9 to filter common patterns
                 sublinear_tf=True,
                 use_idf=True,
                 smooth_idf=True,
@@ -147,8 +208,15 @@ class ClassicalTextClassifier:
         # Linguistic features
         linguistic_features = self.extract_linguistic_features(texts)
         
+        # Ensure all feature matrices are clean
+        word_features = np.nan_to_num(word_features, nan=0.0, posinf=1e6, neginf=-1e6)
+        char_features = np.nan_to_num(char_features, nan=0.0, posinf=1e6, neginf=-1e6)
+        
         # Combine all features
         combined_features = np.hstack([word_features, char_features, linguistic_features])
+        
+        # Final safety check for the combined features
+        combined_features = np.nan_to_num(combined_features, nan=0.0, posinf=1e6, neginf=-1e6)
         
         return combined_features
     
@@ -307,35 +375,36 @@ class ClassicalTextClassifier:
         # Get classifier and parameters
         classifier, param_grid = self._get_classifier_and_params()
         
-        # Train with or without hyperparameter tuning
-        if self.use_hyperparameter_tuning:
-            print(f"Training {self.classifier_type} with hyperparameter tuning...")
-            grid_search = GridSearchCV(
-                classifier, param_grid, cv=cv_folds, scoring='accuracy', 
-                n_jobs=-1, verbose=1
-            )
-            grid_search.fit(X_train, y_train)
-            self.model = grid_search.best_estimator_
-            best_params = grid_search.best_params_
-            print(f"Best parameters: {best_params}")
-        else:
-            print(f"Training {self.classifier_type} with default parameters...")
-            classifier.fit(X_train, y_train)
-            self.model = classifier
-            best_params = {}
-        
-        # Validation predictions
-        val_predictions = self.model.predict(X_val)
-        val_probabilities = self.model.predict_proba(X_val)[:, 1] if hasattr(self.model, 'predict_proba') else None
-        val_accuracy = accuracy_score(y_val, val_predictions)
-        
-        # Test predictions
-        test_predictions = self.model.predict(X_test)
-        test_probabilities = self.model.predict_proba(X_test)[:, 1] if hasattr(self.model, 'predict_proba') else None
-        test_accuracy = accuracy_score(y_test, test_predictions)
-        
-        # Cross-validation score
-        cv_scores = cross_val_score(self.model, X_train, y_train, cv=cv_folds, scoring='accuracy')
+        # Train with or without hyperparameter tuning (with warning suppression)
+        with suppress_sklearn_warnings():
+            if self.use_hyperparameter_tuning:
+                print(f"Training {self.classifier_type} with hyperparameter tuning...")
+                grid_search = GridSearchCV(
+                    classifier, param_grid, cv=cv_folds, scoring='accuracy', 
+                    n_jobs=-1, verbose=1
+                )
+                grid_search.fit(X_train, y_train)
+                self.model = grid_search.best_estimator_
+                best_params = grid_search.best_params_
+                print(f"Best parameters: {best_params}")
+            else:
+                print(f"Training {self.classifier_type} with default parameters...")
+                classifier.fit(X_train, y_train)
+                self.model = classifier
+                best_params = {}
+            
+            # Validation predictions
+            val_predictions = self.model.predict(X_val)
+            val_probabilities = self.model.predict_proba(X_val)[:, 1] if hasattr(self.model, 'predict_proba') else None
+            val_accuracy = accuracy_score(y_val, val_predictions)
+            
+            # Test predictions
+            test_predictions = self.model.predict(X_test)
+            test_probabilities = self.model.predict_proba(X_test)[:, 1] if hasattr(self.model, 'predict_proba') else None
+            test_accuracy = accuracy_score(y_test, test_predictions)
+            
+            # Cross-validation score
+            cv_scores = cross_val_score(self.model, X_train, y_train, cv=cv_folds, scoring='accuracy')
         
         # Calculate metrics
         class_report = classification_report(y_test, test_predictions, 
