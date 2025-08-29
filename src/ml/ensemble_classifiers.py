@@ -285,7 +285,7 @@ class EnsembleTextClassifier:
             base_estimators = [
                 ('rf', RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)),
                 ('svm', SVC(probability=True, random_state=42)),
-                ('lr', LogisticRegression(random_state=42, max_iter=1000)),
+                ('lr', LogisticRegression(random_state=42, max_iter=1000, solver='liblinear')),
                 ('gb', GradientBoostingClassifier(random_state=42))
             ]
             

@@ -285,12 +285,27 @@ class ClassicalTextClassifier:
             }
         elif self.classifier_type == 'logistic_regression':
             classifier = LogisticRegression(random_state=42, max_iter=1000)
-            param_grid = {
-                'C': [0.01, 0.1, 1, 10, 100],
-                'penalty': ['l1', 'l2', 'elasticnet'],
-                'solver': ['liblinear', 'saga'],
-                'l1_ratio': [0.1, 0.5, 0.9]  # Only used with elasticnet
-            }
+            param_grid = [
+                # L1 penalty with liblinear solver
+                {
+                    'C': [0.01, 0.1, 1, 10, 100],
+                    'penalty': ['l1'],
+                    'solver': ['liblinear']
+                },
+                # L2 penalty with multiple solvers
+                {
+                    'C': [0.01, 0.1, 1, 10, 100],
+                    'penalty': ['l2'],
+                    'solver': ['liblinear', 'saga']
+                },
+                # Elasticnet penalty with saga solver and l1_ratio
+                {
+                    'C': [0.01, 0.1, 1, 10, 100],
+                    'penalty': ['elasticnet'],
+                    'solver': ['saga'],
+                    'l1_ratio': [0.1, 0.5, 0.9]
+                }
+            ]
         elif self.classifier_type == 'gradient_boosting':
             # Add better regularization to prevent overfitting
             classifier = GradientBoostingClassifier(
