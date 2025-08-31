@@ -21,6 +21,11 @@ from src.ml.classical_classifiers import ClassicalTextClassifier
 from src.ml.ensemble_classifiers import EnsembleTextClassifier
 from src.ml.sequential_classifier import SequentialTextClassifier
 from src.ml.hybrid_classifier import HybridTextClassifier
+from src.ml.deep_learning_classifiers import DeepLearningTextClassifier
+from src.ml.probabilistic_classifiers import ProbabilisticTextClassifier
+from src.ml.manifold_classifiers import ManifoldTextClassifier
+from src.ml.advanced_classifiers import AdvancedTextClassifier
+from src.ml.interpretable_classifiers import InterpretableTextClassifier
 
 
 def train_single_method(method_type: str, method_name: str, human_file: str,
@@ -258,6 +263,173 @@ def train_single_method(method_type: str, method_name: str, human_file: str,
                 'error': None
             }
             
+        elif method_type == 'deep_learning':
+            classifier = DeepLearningTextClassifier(
+                model_type=method_name,
+                max_features=10000 if reduced_features else 15000,
+                ngram_range=(1, 2) if reduced_features else (1, 3)
+            )
+            
+            result = classifier.train_from_files(
+                human_file=human_file,
+                ai_file=ai_file,
+                test_size=test_size,
+                validation_size=validation_size,
+                epochs=50 if reduced_features else 100,
+                batch_size=16 if reduced_features else 32
+            )
+            
+            training_time = time.time() - start_time
+            
+            # Save model automatically
+            if save_model and model_save_path and classifier:
+                try:
+                    model_path = f"{model_save_path}_{method_name}"
+                    classifier.save_model(model_path)
+                    print(f"Saved deep learning model to {model_path}")
+                except Exception as e:
+                    print(f"Failed to save deep learning model: {e}")
+            
+            return {
+                'method': f'{method_type.title()}: {method_name}',
+                'test_accuracy': result['test_accuracy'],
+                'test_precision': result['test_precision'],
+                'test_recall': result['test_recall'],
+                'test_f1': result['test_f1'],
+                'test_auc': 0.0,  # Deep learning classifier doesn't compute AUC
+                'feature_count': 0,  # Deep learning uses embeddings
+                'training_time': training_time,
+                'cv_mean': 0.0,  # Deep learning doesn't use CV
+                'cv_std': 0.0,
+                'best_params': {},
+                'confusion_matrix': result['confusion_matrix'],
+                'error': None
+            }
+            
+        elif method_type == 'probabilistic':
+            classifier = ProbabilisticTextClassifier(
+                classifier_type=method_name,
+                max_features=10000 if reduced_features else 15000,
+                ngram_range=(1, 2) if reduced_features else (1, 3),
+                use_hyperparameter_tuning=not reduced_features
+            )
+            
+            result = classifier.train_from_files(
+                human_file=human_file,
+                ai_file=ai_file,
+                test_size=test_size,
+                validation_size=validation_size,
+                cv_folds=3 if reduced_cv else 5
+            )
+            
+            training_time = time.time() - start_time
+            result['method'] = f'{method_type.title()}: {method_name}'
+            result['training_time'] = training_time
+            
+            # Save model automatically
+            if save_model and model_save_path and classifier:
+                try:
+                    model_path = f"{model_save_path}_{method_name}"
+                    classifier.save_model(model_path)
+                    print(f"Saved probabilistic model to {model_path}")
+                except Exception as e:
+                    print(f"Failed to save probabilistic model: {e}")
+            
+            return result
+            
+        elif method_type == 'manifold':
+            classifier = ManifoldTextClassifier(
+                manifold_type=method_name,
+                max_features=8000 if reduced_features else 15000,  # Reduced for manifold methods
+                ngram_range=(1, 2) if reduced_features else (1, 3),
+                use_hyperparameter_tuning=not reduced_features
+            )
+            
+            result = classifier.train_from_files(
+                human_file=human_file,
+                ai_file=ai_file,
+                test_size=test_size,
+                validation_size=validation_size,
+                cv_folds=3 if reduced_cv else 5
+            )
+            
+            training_time = time.time() - start_time
+            result['method'] = f'{method_type.title()}: {method_name}'
+            result['training_time'] = training_time
+            
+            # Save model automatically
+            if save_model and model_save_path and classifier:
+                try:
+                    model_path = f"{model_save_path}_{method_name}"
+                    classifier.save_model(model_path)
+                    print(f"Saved manifold model to {model_path}")
+                except Exception as e:
+                    print(f"Failed to save manifold model: {e}")
+            
+            return result
+            
+        elif method_type == 'advanced':
+            classifier = AdvancedTextClassifier(
+                classifier_type=method_name,
+                max_features=10000 if reduced_features else 15000,
+                ngram_range=(1, 2) if reduced_features else (1, 3),
+                use_hyperparameter_tuning=not reduced_features
+            )
+            
+            result = classifier.train_from_files(
+                human_file=human_file,
+                ai_file=ai_file,
+                test_size=test_size,
+                validation_size=validation_size,
+                cv_folds=3 if reduced_cv else 5
+            )
+            
+            training_time = time.time() - start_time
+            result['method'] = f'{method_type.title()}: {method_name}'
+            result['training_time'] = training_time
+            
+            # Save model automatically
+            if save_model and model_save_path and classifier:
+                try:
+                    model_path = f"{model_save_path}_{method_name}"
+                    classifier.save_model(model_path)
+                    print(f"Saved advanced model to {model_path}")
+                except Exception as e:
+                    print(f"Failed to save advanced model: {e}")
+            
+            return result
+            
+        elif method_type == 'interpretable':
+            classifier = InterpretableTextClassifier(
+                classifier_type=method_name,
+                max_features=10000 if reduced_features else 15000,
+                ngram_range=(1, 2) if reduced_features else (1, 3),
+                use_hyperparameter_tuning=not reduced_features
+            )
+            
+            result = classifier.train_from_files(
+                human_file=human_file,
+                ai_file=ai_file,
+                test_size=test_size,
+                validation_size=validation_size,
+                cv_folds=3 if reduced_cv else 5
+            )
+            
+            training_time = time.time() - start_time
+            result['method'] = f'{method_type.title()}: {method_name}'
+            result['training_time'] = training_time
+            
+            # Save model automatically
+            if save_model and model_save_path and classifier:
+                try:
+                    model_path = f"{model_save_path}_{method_name}"
+                    classifier.save_model(model_path)
+                    print(f"Saved interpretable model to {model_path}")
+                except Exception as e:
+                    print(f"Failed to save interpretable model: {e}")
+            
+            return result
+            
     except Exception as e:
         training_time = time.time() - start_time
         return {
@@ -305,6 +477,16 @@ def main():
                        help='Skip sequential (LSTM) classifier training')
     parser.add_argument('--skip-hybrid', action='store_true',
                        help='Skip hybrid classifier training')
+    parser.add_argument('--skip-deep-learning', action='store_true',
+                       help='Skip deep learning classifier training')
+    parser.add_argument('--skip-probabilistic', action='store_true',
+                       help='Skip probabilistic classifier training')
+    parser.add_argument('--skip-manifold', action='store_true',
+                       help='Skip manifold learning classifier training')
+    parser.add_argument('--skip-advanced', action='store_true',
+                       help='Skip advanced classifier training')
+    parser.add_argument('--skip-interpretable', action='store_true',
+                       help='Skip interpretable classifier training')
     
     # Classical ML methods to test
     parser.add_argument('--classical-methods', nargs='+', 
@@ -319,6 +501,42 @@ def main():
                                'catboost', 'extra_trees', 'custom_ensemble'],
                        default=['voting', 'extra_trees'],
                        help='Ensemble methods to test')
+    
+    # Deep learning methods to test
+    parser.add_argument('--deep-learning-methods', nargs='+',
+                       choices=['cnn', 'transformer', 'attention_bilstm'],
+                       default=['cnn'],
+                       help='Deep learning methods to test')
+    
+    # Probabilistic methods to test
+    parser.add_argument('--probabilistic-methods', nargs='+',
+                       choices=['gaussian_nb', 'bernoulli_nb', 'multinomial_nb', 'complement_nb', 
+                               'categorical_nb', 'hmm', 'gaussian_mixture'],
+                       default=['gaussian_nb', 'bernoulli_nb'],
+                       help='Probabilistic methods to test')
+    
+    # Manifold learning methods to test
+    parser.add_argument('--manifold-methods', nargs='+',
+                       choices=['pca', 'tsne', 'isomap', 'lle', 'spectral_embedding', 
+                               'mds', 'ica', 'factor_analysis', 'truncated_svd'],
+                       default=['pca', 'tsne'],
+                       help='Manifold learning methods to test')
+    
+    # Advanced methods to test
+    parser.add_argument('--advanced-methods', nargs='+',
+                       choices=['isolation_forest', 'one_class_svm', 'local_outlier_factor', 
+                               'elliptic_envelope', 'sgd', 'passive_aggressive', 'perceptron', 
+                               'ridge', 'lasso', 'elastic_net', 'huber', 'quantile', 'tweedie'],
+                       default=['isolation_forest', 'sgd'],
+                       help='Advanced methods to test')
+    
+    # Interpretable methods to test
+    parser.add_argument('--interpretable-methods', nargs='+',
+                       choices=['linear_regression', 'lasso_regression', 'ridge_regression', 
+                               'elastic_net_regression', 'decision_tree_classifier', 
+                               'extra_tree_classifier', 'gaussian_nb_classifier'],
+                       default=['linear_regression', 'decision_tree_classifier'],
+                       help='Interpretable methods to test')
     
     # Output options
     parser.add_argument('--output-file', type=str, default='comparison_results_safe.json',
@@ -375,6 +593,26 @@ def main():
     
     if not args.skip_hybrid:
         methods_to_test.append(('hybrid', 'lstm_features'))
+    
+    if not args.skip_deep_learning:
+        for method in args.deep_learning_methods:
+            methods_to_test.append(('deep_learning', method))
+    
+    if not args.skip_probabilistic:
+        for method in args.probabilistic_methods:
+            methods_to_test.append(('probabilistic', method))
+    
+    if not args.skip_manifold:
+        for method in args.manifold_methods:
+            methods_to_test.append(('manifold', method))
+    
+    if not args.skip_advanced:
+        for method in args.advanced_methods:
+            methods_to_test.append(('advanced', method))
+    
+    if not args.skip_interpretable:
+        for method in args.interpretable_methods:
+            methods_to_test.append(('interpretable', method))
     
     # Limit methods if specified
     if args.max_methods and len(methods_to_test) > args.max_methods:
@@ -490,6 +728,11 @@ def main():
             ensemble_results = [v for k, v in successful_results.items() if 'ensemble' in k.lower()]
             sequential_results = [v for k, v in successful_results.items() if 'sequential' in k.lower()]
             hybrid_results = [v for k, v in successful_results.items() if 'hybrid' in k.lower()]
+            deep_learning_results = [v for k, v in successful_results.items() if 'deep_learning' in k.lower()]
+            probabilistic_results = [v for k, v in successful_results.items() if 'probabilistic' in k.lower()]
+            manifold_results = [v for k, v in successful_results.items() if 'manifold' in k.lower()]
+            advanced_results = [v for k, v in successful_results.items() if 'advanced' in k.lower()]
+            interpretable_results = [v for k, v in successful_results.items() if 'interpretable' in k.lower()]
             
             print("\nMETHOD FAMILY ANALYSIS:")
             if neural_results:
@@ -511,6 +754,26 @@ def main():
             if hybrid_results:
                 avg_hybrid = sum(r.get('test_accuracy', 0) for r in hybrid_results) / len(hybrid_results)
                 print(f"Hybrid Models: {len(hybrid_results)} methods, avg accuracy: {avg_hybrid:.4f}")
+            
+            if deep_learning_results:
+                avg_deep_learning = sum(r.get('test_accuracy', 0) for r in deep_learning_results) / len(deep_learning_results)
+                print(f"Deep Learning: {len(deep_learning_results)} methods, avg accuracy: {avg_deep_learning:.4f}")
+            
+            if probabilistic_results:
+                avg_probabilistic = sum(r.get('test_accuracy', 0) for r in probabilistic_results) / len(probabilistic_results)
+                print(f"Probabilistic: {len(probabilistic_results)} methods, avg accuracy: {avg_probabilistic:.4f}")
+            
+            if manifold_results:
+                avg_manifold = sum(r.get('test_accuracy', 0) for r in manifold_results) / len(manifold_results)
+                print(f"Manifold Learning: {len(manifold_results)} methods, avg accuracy: {avg_manifold:.4f}")
+            
+            if advanced_results:
+                avg_advanced = sum(r.get('test_accuracy', 0) for r in advanced_results) / len(advanced_results)
+                print(f"Advanced Methods: {len(advanced_results)} methods, avg accuracy: {avg_advanced:.4f}")
+            
+            if interpretable_results:
+                avg_interpretable = sum(r.get('test_accuracy', 0) for r in interpretable_results) / len(interpretable_results)
+                print(f"Interpretable: {len(interpretable_results)} methods, avg accuracy: {avg_interpretable:.4f}")
         
         else:
             print("No methods completed successfully")

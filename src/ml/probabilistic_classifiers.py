@@ -1,7 +1,8 @@
-"""Advanced machine learning classifiers for AI vs Human text detection.
+"""Probabilistic machine learning classifiers for AI vs Human text detection.
 
-This module implements additional ML algorithms that complement the existing
-classical, ensemble, and interpretable methods using the same pipeline.
+This module implements probabilistic approaches including Bayesian methods,
+Hidden Markov Models, and other probabilistic classifiers using the same
+pipeline as other classifiers.
 """
 import json
 import os
@@ -16,16 +17,9 @@ from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_sc
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import RBF, Matern, RationalQuadratic
-from sklearn.linear_model import PassiveAggressiveClassifier, SGDClassifier
-from sklearn.svm import OneClassSVM
-from sklearn.ensemble import IsolationForest
-from sklearn.neighbors import NearestCentroid
+from sklearn.naive_bayes import GaussianNB, BernoulliNB, CategoricalNB
+from sklearn.mixture import GaussianMixture
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
-from sklearn.cluster import KMeans
-from sklearn.semi_supervised import LabelPropagation, LabelSpreading
-from sklearn.base import clone
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
@@ -33,17 +27,195 @@ import joblib
 from .model_serializer import ModelPackage, ModelSerializer
 
 
-class AdvancedTextClassifier:
-    """Advanced ML classifier using the same pipeline as other methods."""
+class BayesianNetworkClassifier:
+    """Simple Bayesian Network classifier for text classification."""
     
-    def __init__(self, classifier_type: str = 'gaussian_process', max_features: int = 15000, 
+    def __init__(self, smoothing: float = 1.0):
+        self.smoothing = smoothing
+        self.feature_probs = {}
+        self.class_probs = {}
+        self.feature_names = []
+        
+    def fit(self, X, y):
+        """Fit the Bayesian Network classifier."""
+        n_samples, n_features = X.shape
+        classes = np.unique(y)
+        
+        # Calculate class probabilities
+        for cls in classes:
+            self.class_probs[cls] = np.sum(y == cls) / n_samples
+        
+        # Calculate feature probabilities for each class
+        for cls in classes:
+            class_mask = y == cls
+            class_data = X[class_mask]
+            
+            self.feature_probs[cls] = {}
+            for feature_idx in range(n_features):
+                feature_values = class_data[:, feature_idx]
+                
+                # For continuous features, use Gaussian assumption
+                mean = np.mean(feature_values)
+                std = np.std(feature_values) + 1e-9  # Add small epsilon
+                self.feature_probs[cls][feature_idx] = {'mean': mean, 'std': std}
+    
+    def predict_proba(self, X):
+        """Predict class probabilities."""
+        n_samples = X.shape[0]
+        classes = list(self.class_probs.keys())
+        probabilities = np.zeros((n_samples, len(classes)))
+        
+        for i, sample in enumerate(X):
+            for j, cls in enumerate(classes):
+                # Start with class prior
+                log_prob = np.log(self.class_probs[cls])
+                
+                # Add feature likelihoods
+                for feature_idx, feature_value in enumerate(sample):
+                    mean = self.feature_probs[cls][feature_idx]['mean']
+                    std = self.feature_probs[cls][feature_idx]['std']
+                    
+                    # Gaussian likelihood
+                    likelihood = (1 / (std * np.sqrt(2 * np.pi))) * \
+                               np.exp(-0.5 * ((feature_value - mean) / std) ** 2)
+                    log_prob += np.log(likelihood + 1e-9)
+                
+                probabilities[i, j] = log_prob
+        
+        # Convert log probabilities to probabilities
+        probabilities = np.exp(probabilities)
+        probabilities = probabilities / probabilities.sum(axis=1, keepdims=True)
+        
+        return probabilities
+    
+    def predict(self, X):
+        """Predict class labels."""
+        probabilities = self.predict_proba(X)
+        return np.argmax(probabilities, axis=1)
+
+
+class HiddenMarkovModelClassifier:
+    """Hidden Markov Model classifier for sequential text features."""
+    
+    def __init__(self, n_states: int = 3):
+        self.n_states = n_states
+        self.models = {}
+        
+    def _extract_sequences(self, texts: List[str]) -> List[List[int]]:
+        """Extract character-level sequences from texts."""
+        sequences = []
+        for text in texts:
+            # Convert to character codes and normalize
+            char_sequence = [min(ord(c), 127) for c in text.lower()[:100]]  # Limit length
+            sequences.append(char_sequence)
+        return sequences
+    
+    def fit(self, texts: List[str], labels: List[int]):
+        """Fit HMM models for each class."""
+        sequences = self._extract_sequences(texts)
+        classes = np.unique(labels)
+        
+        for cls in classes:
+            class_sequences = [seq for i, seq in enumerate(sequences) if labels[i] == cls]
+            
+            # Simple HMM implementation
+            self.models[cls] = self._fit_hmm(class_sequences)
+    
+    def _fit_hmm(self, sequences: List[List[int]]) -> Dict[str, Any]:
+        """Fit a simple HMM to sequences."""
+        # Transition probabilities
+        transitions = {}
+        emissions = {}
+        
+        for seq in sequences:
+            for i in range(len(seq) - 1):
+                current_state = seq[i] % self.n_states
+                next_state = seq[i + 1] % self.n_states
+                
+                if current_state not in transitions:
+                    transitions[current_state] = {}
+                if next_state not in transitions[current_state]:
+                    transitions[current_state][next_state] = 0
+                transitions[current_state][next_state] += 1
+                
+                # Emission probabilities
+                if current_state not in emissions:
+                    emissions[current_state] = {}
+                if seq[i] not in emissions[current_state]:
+                    emissions[current_state][seq[i]] = 0
+                emissions[current_state][seq[i]] += 1
+        
+        # Normalize probabilities
+        for state in transitions:
+            total = sum(transitions[state].values())
+            for next_state in transitions[state]:
+                transitions[state][next_state] /= total
+        
+        for state in emissions:
+            total = sum(emissions[state].values())
+            for emission in emissions[state]:
+                emissions[state][emission] /= total
+        
+        return {'transitions': transitions, 'emissions': emissions}
+    
+    def predict_proba(self, texts: List[str]) -> np.ndarray:
+        """Predict probabilities using HMM models."""
+        sequences = self._extract_sequences(texts)
+        classes = list(self.models.keys())
+        probabilities = np.zeros((len(texts), len(classes)))
+        
+        for i, seq in enumerate(sequences):
+            for j, cls in enumerate(classes):
+                prob = self._sequence_probability(seq, self.models[cls])
+                probabilities[i, j] = prob
+        
+        # Normalize probabilities
+        probabilities = probabilities / (probabilities.sum(axis=1, keepdims=True) + 1e-9)
+        return probabilities
+    
+    def _sequence_probability(self, sequence: List[int], model: Dict[str, Any]) -> float:
+        """Calculate probability of sequence given HMM model."""
+        if len(sequence) == 0:
+            return 1e-9
+        
+        log_prob = 0.0
+        transitions = model['transitions']
+        emissions = model['emissions']
+        
+        for i in range(len(sequence) - 1):
+            current_state = sequence[i] % self.n_states
+            next_state = sequence[i + 1] % self.n_states
+            
+            # Transition probability
+            if current_state in transitions and next_state in transitions[current_state]:
+                log_prob += np.log(transitions[current_state][next_state] + 1e-9)
+            else:
+                log_prob += np.log(1e-9)
+            
+            # Emission probability
+            if current_state in emissions and sequence[i] in emissions[current_state]:
+                log_prob += np.log(emissions[current_state][sequence[i]] + 1e-9)
+            else:
+                log_prob += np.log(1e-9)
+        
+        return np.exp(log_prob)
+    
+    def predict(self, texts: List[str]) -> np.ndarray:
+        """Predict class labels."""
+        probabilities = self.predict_proba(texts)
+        return np.argmax(probabilities, axis=1)
+
+
+class ProbabilisticTextClassifier:
+    """Probabilistic ML classifier using various probabilistic approaches."""
+    
+    def __init__(self, classifier_type: str = 'gaussian_nb', max_features: int = 15000, 
                  ngram_range: Tuple[int, int] = (1, 3), use_hyperparameter_tuning: bool = True):
-        """Initialize the advanced classifier.
+        """Initialize the probabilistic classifier.
         
         Args:
-            classifier_type: Type of classifier ('gaussian_process', 'passive_aggressive', 
-                           'sgd_online', 'one_class_svm', 'isolation_forest', 'nearest_centroid',
-                           'lda', 'qda', 'cluster_based', 'label_propagation')
+            classifier_type: Type of classifier ('gaussian_nb', 'bernoulli_nb', 'categorical_nb',
+                           'gaussian_mixture', 'lda', 'qda', 'bayesian_network', 'hmm')
             max_features: Maximum number of features for TF-IDF vectorization.
             ngram_range: Range of n-grams to extract.
             use_hyperparameter_tuning: Whether to use grid search for hyperparameter tuning.
@@ -58,43 +230,38 @@ class AdvancedTextClassifier:
         self.model = None
         self.feature_names = None
         
-        # Special handling for anomaly detection methods
-        self.is_anomaly_detector = classifier_type in ['one_class_svm', 'isolation_forest']
-        self.human_model = None  # For anomaly detection
-        self.ai_model = None     # For anomaly detection
-        
     def extract_linguistic_features(self, texts: List[str]) -> np.ndarray:
-        """Extract linguistic features from texts (same as other classifiers)."""
+        """Extract linguistic features from texts."""
         features = []
         
         for text in texts:
             text_features = []
             
             # Basic statistics
-            text_features.append(len(text))  # Text length
-            text_features.append(len(text.split()))  # Word count
-            text_features.append(len(text.split()) / len(text) if len(text) > 0 else 0)  # Word density
+            text_features.append(len(text))
+            text_features.append(len(text.split()))
+            text_features.append(len(text.split()) / len(text) if len(text) > 0 else 0)
             
             # Sentence statistics
             sentences = text.split('.')
-            text_features.append(len(sentences))  # Sentence count
-            text_features.append(np.mean([len(s.split()) for s in sentences if s.strip()]))  # Avg words per sentence
+            text_features.append(len(sentences))
+            text_features.append(np.mean([len(s.split()) for s in sentences if s.strip()]))
             
             # Character-level features
-            text_features.append(sum(1 for c in text if c.isupper()) / len(text) if len(text) > 0 else 0)  # Uppercase ratio
-            text_features.append(sum(1 for c in text if c.islower()) / len(text) if len(text) > 0 else 0)  # Lowercase ratio
-            text_features.append(sum(1 for c in text if c.isdigit()) / len(text) if len(text) > 0 else 0)  # Digit ratio
-            text_features.append(sum(1 for c in text if c in '.,!?;:') / len(text) if len(text) > 0 else 0)  # Punctuation ratio
+            text_features.append(sum(1 for c in text if c.isupper()) / len(text) if len(text) > 0 else 0)
+            text_features.append(sum(1 for c in text if c.islower()) / len(text) if len(text) > 0 else 0)
+            text_features.append(sum(1 for c in text if c.isdigit()) / len(text) if len(text) > 0 else 0)
+            text_features.append(sum(1 for c in text if c in '.,!?;:') / len(text) if len(text) > 0 else 0)
             
             # Vocabulary complexity
             words = text.lower().split()
             unique_words = set(words)
-            text_features.append(len(unique_words) / len(words) if len(words) > 0 else 0)  # Lexical diversity
+            text_features.append(len(unique_words) / len(words) if len(words) > 0 else 0)
             
             # Average word length
             text_features.append(np.mean([len(word) for word in words]) if words else 0)
             
-            # Readability approximation (Flesch-like)
+            # Readability approximation
             avg_sentence_length = len(words) / len(sentences) if len(sentences) > 0 else 0
             avg_syllables = np.mean([max(1, len(re.findall(r'[aeiouAEIOU]', word))) for word in words]) if words else 0
             flesch_score = 206.835 - (1.015 * avg_sentence_length) - (84.6 * avg_syllables)
@@ -108,14 +275,14 @@ class AdvancedTextClassifier:
             # Repetition patterns
             bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
             unique_bigrams = set(bigrams)
-            text_features.append(len(unique_bigrams) / len(bigrams) if len(bigrams) > 0 else 0)  # Bigram diversity
+            text_features.append(len(unique_bigrams) / len(bigrams) if len(bigrams) > 0 else 0)
             
             features.append(text_features)
         
         return np.array(features)
     
     def extract_features(self, texts: List[str]) -> np.ndarray:
-        """Extract comprehensive features (same as other classifiers)."""
+        """Extract comprehensive features."""
         # Word-level TF-IDF features
         if self.word_vectorizer is None:
             self.word_vectorizer = TfidfVectorizer(
@@ -163,7 +330,7 @@ class AdvancedTextClassifier:
         return combined_features
     
     def load_corpus_files(self, human_file: str, ai_file: str) -> Tuple[List[str], List[int]]:
-        """Load and prepare training data (same as other classifiers)."""
+        """Load and prepare training data."""
         texts = []
         labels = []
         
@@ -183,7 +350,7 @@ class AdvancedTextClassifier:
                     
                     if text and len(text.strip()) > 20:
                         texts.append(text.strip())
-                        labels.append(0)  # Human-written
+                        labels.append(0)
                 except (json.JSONDecodeError, KeyError) as e:
                     continue
         
@@ -197,7 +364,7 @@ class AdvancedTextClassifier:
                         text = record['llm_transformation']['rewritten_text']
                         if text and len(text.strip()) > 20:
                             texts.append(text.strip())
-                            labels.append(1)  # AI-generated
+                            labels.append(1)
                 except (json.JSONDecodeError, KeyError) as e:
                     continue
         
@@ -209,57 +376,30 @@ class AdvancedTextClassifier:
     
     def _get_classifier_and_params(self):
         """Get classifier and hyperparameter grid based on classifier type."""
-        if self.classifier_type == 'gaussian_process':
-            # Gaussian Process with different kernels
-            classifier = GaussianProcessClassifier(random_state=42)
+        if self.classifier_type == 'gaussian_nb':
+            classifier = GaussianNB()
             param_grid = {
-                'kernel': [
-                    RBF(1.0),
-                    Matern(length_scale=1.0, nu=1.5),
-                    RationalQuadratic(length_scale=1.0, alpha=1.0)
-                ],
-                'n_restarts_optimizer': [0, 2, 5]
+                'var_smoothing': [1e-9, 1e-8, 1e-7, 1e-6, 1e-5]
             }
             
-        elif self.classifier_type == 'passive_aggressive':
-            classifier = PassiveAggressiveClassifier(random_state=42)
+        elif self.classifier_type == 'bernoulli_nb':
+            classifier = BernoulliNB()
             param_grid = {
-                'C': [0.01, 0.1, 1.0, 10.0],
-                'loss': ['hinge', 'squared_hinge'],
-                'max_iter': [1000, 2000, 5000]
+                'alpha': [0.1, 0.5, 1.0, 2.0],
+                'binarize': [0.0, 0.1, 0.5]
             }
             
-        elif self.classifier_type == 'sgd_online':
-            classifier = SGDClassifier(random_state=42)
+        elif self.classifier_type == 'categorical_nb':
+            classifier = CategoricalNB()
             param_grid = {
-                'loss': ['log', 'modified_huber', 'squared_hinge'],
-                'alpha': [0.0001, 0.001, 0.01, 0.1],
-                'learning_rate': ['constant', 'optimal', 'invscaling'],
-                'eta0': [0.01, 0.1, 1.0]
+                'alpha': [0.1, 0.5, 1.0, 2.0]
             }
             
-        elif self.classifier_type == 'one_class_svm':
-            # Special case: anomaly detection
-            classifier = OneClassSVM(kernel='rbf')
+        elif self.classifier_type == 'gaussian_mixture':
+            classifier = GaussianMixtureClassifier()
             param_grid = {
-                'nu': [0.01, 0.05, 0.1, 0.2],
-                'gamma': ['scale', 'auto', 0.001, 0.01, 0.1]
-            }
-            
-        elif self.classifier_type == 'isolation_forest':
-            # Special case: anomaly detection
-            classifier = IsolationForest(random_state=42)
-            param_grid = {
-                'contamination': [0.05, 0.1, 0.15, 0.2],
-                'n_estimators': [50, 100, 200],
-                'max_features': [0.5, 0.7, 1.0]
-            }
-            
-        elif self.classifier_type == 'nearest_centroid':
-            classifier = NearestCentroid()
-            param_grid = {
-                'metric': ['euclidean', 'manhattan'],
-                'shrink_threshold': [None, 0.1, 0.5, 1.0]
+                'n_components': [2, 3, 5, 10],
+                'covariance_type': ['full', 'tied', 'diag', 'spherical']
             }
             
         elif self.classifier_type == 'lda':
@@ -275,20 +415,16 @@ class AdvancedTextClassifier:
                 'reg_param': [0.0, 0.01, 0.1, 0.5]
             }
             
-        elif self.classifier_type == 'cluster_based':
-            # Custom cluster-based classifier
-            classifier = ClusterBasedClassifier()
+        elif self.classifier_type == 'bayesian_network':
+            classifier = BayesianNetworkClassifier()
             param_grid = {
-                'n_clusters': [10, 20, 50],
-                'base_classifier': ['logistic', 'svm']
+                'smoothing': [0.1, 0.5, 1.0, 2.0]
             }
             
-        elif self.classifier_type == 'label_propagation':
-            classifier = LabelPropagation()
+        elif self.classifier_type == 'hmm':
+            classifier = HiddenMarkovModelClassifier()
             param_grid = {
-                'kernel': ['knn', 'rbf'],
-                'gamma': [1, 10, 100],
-                'n_neighbors': [3, 5, 7]
+                'n_states': [2, 3, 5, 10]
             }
             
         else:
@@ -298,21 +434,29 @@ class AdvancedTextClassifier:
     
     def train_from_files(self, human_file: str, ai_file: str, test_size: float = 0.2, 
                         validation_size: float = 0.15, cv_folds: int = 5) -> Dict[str, Any]:
-        """Train the advanced classifier using the same pipeline."""
+        """Train the probabilistic classifier."""
         # Load data
         texts, labels = self.load_corpus_files(human_file, ai_file)
         
         if len(texts) == 0:
             raise ValueError("No texts provided for training")
         
+        # Handle HMM separately as it works with raw texts
+        if self.classifier_type == 'hmm':
+            return self._train_hmm(texts, labels, test_size, validation_size)
+        
         # Extract features
         print("Extracting comprehensive features (word + character + linguistic)...")
         features = self.extract_features(texts)
         print(f"Extracted {features.shape[1]} total features")
         
-        # Scale features
-        self.scaler = StandardScaler()
-        features_scaled = self.scaler.fit_transform(features)
+        # Scale features for some classifiers
+        if self.classifier_type in ['gaussian_nb', 'lda', 'qda', 'gaussian_mixture', 'bayesian_network']:
+            self.scaler = StandardScaler()
+            features_scaled = self.scaler.fit_transform(features)
+        else:
+            features_scaled = features
+            self.scaler = None
         
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
@@ -326,10 +470,6 @@ class AdvancedTextClassifier:
         print(f"Training set: {len(X_train)} samples")
         print(f"Validation set: {len(X_val)} samples")
         print(f"Test set: {len(X_test)} samples")
-        
-        # Handle anomaly detection methods differently
-        if self.is_anomaly_detector:
-            return self._train_anomaly_detector(X_train, X_val, X_test, y_train, y_val, y_test)
         
         # Get classifier and parameters
         classifier, param_grid = self._get_classifier_and_params()
@@ -403,73 +543,33 @@ class AdvancedTextClassifier:
         
         return results
     
-    def _train_anomaly_detector(self, X_train, X_val, X_test, y_train, y_val, y_test):
-        """Train anomaly detection models separately for each class."""
-        print(f"Training {self.classifier_type} anomaly detector...")
+    def _train_hmm(self, texts: List[str], labels: List[int], test_size: float, validation_size: float) -> Dict[str, Any]:
+        """Train HMM classifier separately."""
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            texts, labels, test_size=test_size, random_state=42, stratify=labels
+        )
         
-        # Separate training data by class
-        human_indices = np.where(np.array(y_train) == 0)[0]
-        ai_indices = np.where(np.array(y_train) == 1)[0]
+        X_train, X_val, y_train, y_val = train_test_split(
+            X_train, y_train, test_size=validation_size, random_state=42, stratify=y_train
+        )
         
-        X_human = X_train[human_indices]
-        X_ai = X_train[ai_indices]
+        print(f"Training set: {len(X_train)} samples")
+        print(f"Validation set: {len(X_val)} samples")
+        print(f"Test set: {len(X_test)} samples")
         
-        # Get classifier and parameters
-        classifier, param_grid = self._get_classifier_and_params()
-        
-        # Train separate models for each class
-        if self.use_hyperparameter_tuning and param_grid:
-            # Human model
-            grid_search_human = GridSearchCV(
-                classifier, param_grid, cv=3, scoring='accuracy', n_jobs=-1
-            )
-            grid_search_human.fit(X_human)
-            self.human_model = grid_search_human.best_estimator_
-            
-            # AI model
-            grid_search_ai = GridSearchCV(
-                classifier, param_grid, cv=3, scoring='accuracy', n_jobs=-1
-            )
-            grid_search_ai.fit(X_ai)
-            self.ai_model = grid_search_ai.best_estimator_
-            
-            best_params = {
-                'human_params': grid_search_human.best_params_,
-                'ai_params': grid_search_ai.best_params_
-            }
-        else:
-            # Train with default parameters
-            from sklearn.base import clone
-            self.human_model = clone(classifier)
-            self.ai_model = clone(classifier)
-            
-            self.human_model.fit(X_human)
-            self.ai_model.fit(X_ai)
-            best_params = {}
-        
-        # Make predictions using anomaly scores
-        def predict_anomaly(X):
-            human_scores = self.human_model.decision_function(X)
-            ai_scores = self.ai_model.decision_function(X)
-            
-            # Higher score means more normal for that class
-            # Predict the class with higher normality score
-            predictions = (ai_scores > human_scores).astype(int)
-            
-            # Create pseudo-probabilities from scores
-            human_probs = 1 / (1 + np.exp(-human_scores))  # Sigmoid
-            ai_probs = 1 / (1 + np.exp(-ai_scores))
-            total_probs = human_probs + ai_probs
-            probabilities = ai_probs / total_probs  # Normalize
-            
-            return predictions, probabilities
+        # Train HMM
+        self.model = HiddenMarkovModelClassifier(n_states=3)
+        self.model.fit(X_train, y_train)
         
         # Validation predictions
-        val_predictions, val_probabilities = predict_anomaly(X_val)
+        val_predictions = self.model.predict(X_val)
+        val_probabilities = self.model.predict_proba(X_val)[:, 1]
         val_accuracy = accuracy_score(y_val, val_predictions)
         
         # Test predictions
-        test_predictions, test_probabilities = predict_anomaly(X_test)
+        test_predictions = self.model.predict(X_test)
+        test_probabilities = self.model.predict_proba(X_test)[:, 1]
         test_accuracy = accuracy_score(y_test, test_predictions)
         
         # Calculate metrics
@@ -478,8 +578,8 @@ class AdvancedTextClassifier:
         
         results = {
             'classifier_type': self.classifier_type,
-            'best_params': best_params,
-            'cv_scores': np.array([test_accuracy]),  # Single score for anomaly detection
+            'best_params': {},
+            'cv_scores': np.array([test_accuracy]),
             'cv_mean': test_accuracy,
             'cv_std': 0.0,
             'val_accuracy': val_accuracy,
@@ -487,13 +587,13 @@ class AdvancedTextClassifier:
             'test_precision': class_report['weighted avg']['precision'],
             'test_recall': class_report['weighted avg']['recall'],
             'test_f1': class_report['weighted avg']['f1-score'],
+            'test_auc': roc_auc_score(y_test, test_probabilities),
             'classification_report': class_report,
             'confusion_matrix': confusion_matrix(y_test, test_predictions),
-            'feature_count': X_train.shape[1],
-            'test_auc': roc_auc_score(y_test, test_probabilities)
+            'feature_count': 0
         }
         
-        print(f"\n{self.classifier_type.title()} Anomaly Detector Results:")
+        print(f"\nHMM Model Results:")
         print(f"Validation accuracy: {val_accuracy:.4f}")
         print(f"Test accuracy: {test_accuracy:.4f}")
         print(f"Test precision: {results['test_precision']:.4f}")
@@ -508,34 +608,22 @@ class AdvancedTextClassifier:
     
     def predict(self, texts: List[str]) -> Tuple[np.ndarray, np.ndarray]:
         """Predict whether texts are AI-generated or human-written."""
-        if self.is_anomaly_detector:
-            if self.human_model is None or self.ai_model is None:
-                raise ValueError("Anomaly detection models not trained. Call train_from_files() first.")
+        if self.model is None:
+            raise ValueError("Model not trained. Call train_from_files() first.")
+        
+        if self.classifier_type == 'hmm':
+            # HMM works with raw texts
+            predictions = self.model.predict(texts)
+            probabilities = self.model.predict_proba(texts)[:, 1]
         else:
-            if self.model is None:
-                raise ValueError("Model not trained. Call train_from_files() first.")
-        
-        if self.word_vectorizer is None or self.scaler is None:
-            raise ValueError("Preprocessing components not available. Call train_from_files() first.")
-        
-        # Extract and scale features
-        features = self.extract_features(texts)
-        features_scaled = self.scaler.transform(features)
-        
-        if self.is_anomaly_detector:
-            # Use anomaly detection prediction
-            human_scores = self.human_model.decision_function(features_scaled)
-            ai_scores = self.ai_model.decision_function(features_scaled)
+            # Extract and scale features
+            features = self.extract_features(texts)
+            if self.scaler is not None:
+                features_scaled = self.scaler.transform(features)
+            else:
+                features_scaled = features
             
-            predictions = (ai_scores > human_scores).astype(int)
-            
-            # Create pseudo-probabilities
-            human_probs = 1 / (1 + np.exp(-human_scores))
-            ai_probs = 1 / (1 + np.exp(-ai_scores))
-            total_probs = human_probs + ai_probs
-            probabilities = ai_probs / total_probs
-        else:
-            # Regular prediction
+            # Predict
             predictions = self.model.predict(features_scaled)
             probabilities = self.model.predict_proba(features_scaled)[:, 1] if hasattr(self.model, 'predict_proba') else np.zeros_like(predictions)
         
@@ -543,26 +631,20 @@ class AdvancedTextClassifier:
     
     def save_model(self, model_path: str):
         """Save the trained model and preprocessing components."""
-        if self.is_anomaly_detector:
-            if self.human_model is None or self.ai_model is None:
-                raise ValueError("No anomaly detection models to save. Train the models first.")
-        else:
-            if self.model is None:
-                raise ValueError("No model to save. Train the model first.")
+        if self.model is None:
+            raise ValueError("No model to save. Train the model first.")
         
-        package = ModelPackage('advanced')
+        package = ModelPackage('probabilistic')
         
-        # Add the model(s)
-        if self.is_anomaly_detector:
-            # For anomaly detectors, store both models in metadata
-            package.add_model({'human_model': self.human_model, 'ai_model': self.ai_model})
-        else:
-            package.add_model(self.model)
+        # Add the model
+        package.add_model(self.model)
         
-        # Add vectorizers and scaler
-        package.add_word_vectorizer(self.word_vectorizer)
-        package.add_char_vectorizer(self.char_vectorizer)
-        package.add_scaler(self.scaler)
+        # Add vectorizers and scaler (if not HMM)
+        if self.classifier_type != 'hmm':
+            package.add_word_vectorizer(self.word_vectorizer)
+            package.add_char_vectorizer(self.char_vectorizer)
+            if self.scaler is not None:
+                package.add_scaler(self.scaler)
         
         # Add configuration as metadata
         package.metadata.update({
@@ -570,8 +652,7 @@ class AdvancedTextClassifier:
             'max_features': self.max_features,
             'ngram_range': self.ngram_range,
             'use_hyperparameter_tuning': self.use_hyperparameter_tuning,
-            'is_anomaly_detector': self.is_anomaly_detector,
-            'model_architecture': 'AdvancedTextClassifier'
+            'model_architecture': 'ProbabilisticTextClassifier'
         })
         
         return ModelSerializer.save_model_package(package, model_path)
@@ -584,22 +665,13 @@ class AdvancedTextClassifier:
         self.max_features = package.metadata['max_features']
         self.ngram_range = package.metadata['ngram_range']
         self.use_hyperparameter_tuning = package.metadata['use_hyperparameter_tuning']
-        self.is_anomaly_detector = package.metadata['is_anomaly_detector']
         
-        # Load model(s)
-        if self.is_anomaly_detector:
-            # For anomaly detectors, models are stored as a dictionary
-            models_dict = package.model
-            self.human_model = models_dict['human_model']
-            self.ai_model = models_dict['ai_model']
-        else:
-            self.model = package.model
+        self.model = package.model
         
-        # Load preprocessing components
-        self.word_vectorizer = package.word_vectorizer
-        self.char_vectorizer = package.char_vectorizer
-        self.scaler = package.scaler
-        
+        if self.classifier_type != 'hmm':
+            self.word_vectorizer = package.word_vectorizer
+            self.char_vectorizer = package.char_vectorizer
+            self.scaler = package.scaler
     
     def plot_confusion_matrix(self, confusion_matrix: np.ndarray, save_path: Optional[str] = None):
         """Plot confusion matrix."""
@@ -617,70 +689,57 @@ class AdvancedTextClassifier:
         plt.show()
 
 
-class ClusterBasedClassifier:
-    """Custom cluster-based classifier for the advanced classifier."""
+class GaussianMixtureClassifier:
+    """Gaussian Mixture Model classifier wrapper for sklearn compatibility."""
     
-    def __init__(self, n_clusters=20, base_classifier='logistic'):
-        self.n_clusters = n_clusters
-        self.base_classifier = base_classifier
-        self.kmeans = None
-        self.cluster_classifiers = {}
-        self.global_classifier = None
+    def __init__(self, n_components: int = 2, covariance_type: str = 'full'):
+        self.n_components = n_components
+        self.covariance_type = covariance_type
+        self.models = {}
+        self.classes_ = None
         
     def fit(self, X, y):
-        """Fit the cluster-based classifier."""
-        # Perform clustering
-        self.kmeans = KMeans(n_clusters=self.n_clusters, random_state=42)
-        cluster_labels = self.kmeans.fit_predict(X)
+        """Fit Gaussian Mixture Models for each class."""
+        self.classes_ = np.unique(y)
         
-        # Train a classifier for each cluster
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.svm import SVC
+        for cls in self.classes_:
+            class_mask = y == cls
+            class_data = X[class_mask]
+            
+            gmm = GaussianMixture(
+                n_components=self.n_components,
+                covariance_type=self.covariance_type,
+                random_state=42
+            )
+            gmm.fit(class_data)
+            self.models[cls] = gmm
         
-        base_clf = LogisticRegression(random_state=42) if self.base_classifier == 'logistic' else SVC(probability=True, random_state=42)
-        
-        for cluster_id in range(self.n_clusters):
-            cluster_mask = cluster_labels == cluster_id
-            if np.sum(cluster_mask) > 1 and len(np.unique(y[cluster_mask])) > 1:  # Ensure we have samples and both classes
-                cluster_clf = clone(base_clf)
-                cluster_clf.fit(X[cluster_mask], y[cluster_mask])
-                self.cluster_classifiers[cluster_id] = cluster_clf
-        
-        # Train a global classifier as fallback
-        self.global_classifier = clone(base_clf)
-        self.global_classifier.fit(X, y)
-        
-    def predict(self, X):
-        """Predict using cluster-based approach."""
-        cluster_labels = self.kmeans.predict(X)
-        predictions = np.zeros(len(X))
-        
-        for i, cluster_id in enumerate(cluster_labels):
-            if cluster_id in self.cluster_classifiers:
-                predictions[i] = self.cluster_classifiers[cluster_id].predict(X[i:i+1])[0]
-            else:
-                predictions[i] = self.global_classifier.predict(X[i:i+1])[0]
-        
-        return predictions.astype(int)
+        return self
     
     def predict_proba(self, X):
-        """Predict probabilities using cluster-based approach."""
-        cluster_labels = self.kmeans.predict(X)
-        probabilities = np.zeros((len(X), 2))
+        """Predict class probabilities using GMM likelihoods."""
+        n_samples = X.shape[0]
+        probabilities = np.zeros((n_samples, len(self.classes_)))
         
-        for i, cluster_id in enumerate(cluster_labels):
-            if cluster_id in self.cluster_classifiers:
-                probabilities[i] = self.cluster_classifiers[cluster_id].predict_proba(X[i:i+1])[0]
-            else:
-                probabilities[i] = self.global_classifier.predict_proba(X[i:i+1])[0]
+        for i, cls in enumerate(self.classes_):
+            probabilities[:, i] = self.models[cls].score_samples(X)
+        
+        # Convert log-likelihoods to probabilities
+        probabilities = np.exp(probabilities)
+        probabilities = probabilities / probabilities.sum(axis=1, keepdims=True)
         
         return probabilities
+    
+    def predict(self, X):
+        """Predict class labels."""
+        probabilities = self.predict_proba(X)
+        return self.classes_[np.argmax(probabilities, axis=1)]
     
     def get_params(self, deep=True):
         """Get parameters for sklearn compatibility."""
         return {
-            'n_clusters': self.n_clusters,
-            'base_classifier': self.base_classifier
+            'n_components': self.n_components,
+            'covariance_type': self.covariance_type
         }
     
     def set_params(self, **params):
@@ -690,17 +749,16 @@ class ClusterBasedClassifier:
         return self
 
 
-def compare_advanced_classifiers(human_file: str, ai_file: str, classifiers: List[str] = None, 
-                               test_size: float = 0.2, validation_size: float = 0.15) -> Dict[str, Dict[str, Any]]:
-    """Compare multiple advanced classifiers using the same data split."""
+def compare_probabilistic_classifiers(human_file: str, ai_file: str, classifiers: List[str] = None, 
+                                    test_size: float = 0.2, validation_size: float = 0.15) -> Dict[str, Dict[str, Any]]:
+    """Compare multiple probabilistic classifiers using the same data split."""
     if classifiers is None:
-        classifiers = ['gaussian_process', 'passive_aggressive', 'sgd_online', 
-                      'one_class_svm', 'isolation_forest', 'nearest_centroid', 
-                      'lda', 'qda', 'label_propagation']
+        classifiers = ['gaussian_nb', 'bernoulli_nb', 'gaussian_mixture', 'lda', 'qda', 
+                      'bayesian_network', 'hmm']
     
     results = {}
     
-    print("=== Comparing Advanced ML Classifiers ===")
+    print("=== Comparing Probabilistic Classifiers ===")
     print(f"Human file: {human_file}")
     print(f"AI file: {ai_file}")
     print(f"Classifiers to test: {classifiers}")
@@ -709,7 +767,7 @@ def compare_advanced_classifiers(human_file: str, ai_file: str, classifiers: Lis
     for classifier_type in classifiers:
         print(f"\nTraining {classifier_type}...")
         try:
-            classifier = AdvancedTextClassifier(
+            classifier = ProbabilisticTextClassifier(
                 classifier_type=classifier_type,
                 max_features=15000,
                 ngram_range=(1, 3),
@@ -731,7 +789,7 @@ def compare_advanced_classifiers(human_file: str, ai_file: str, classifiers: Lis
     
     # Print comparison summary
     print("\n" + "=" * 80)
-    print("ADVANCED CLASSIFIER COMPARISON SUMMARY")
+    print("PROBABILISTIC CLASSIFIER COMPARISON SUMMARY")
     print("=" * 80)
     print(f"{'Classifier':<20} {'CV Acc':<10} {'Test Acc':<10} {'Precision':<10} {'Recall':<10} {'F1':<10} {'AUC':<10}")
     print("-" * 80)

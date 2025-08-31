@@ -65,14 +65,17 @@ class ModelSerializer:
             'scaler': package.scaler
         }
         
-        if package.model_type in ['enhanced', 'hybrid', 'sequential', 'lstm']:
+        # Handle PyTorch models by extracting state_dict
+        if package.model is not None:
             if hasattr(package.model, 'state_dict'):
+                # This is a PyTorch model, save its state_dict
                 package_data['model_state_dict'] = package.model.state_dict()
                 package_data['model_config'] = package.config
             else:
+                # This is a regular model (sklearn, etc.)
                 package_data['model'] = package.model
         else:
-            package_data['model'] = package.model
+            package_data['model'] = None
         
         save_path = f"{filepath}.pkl"
         with open(save_path, 'wb') as f:
@@ -95,8 +98,12 @@ class ModelSerializer:
         if not filepath.suffix:
             filepath = filepath.with_suffix('.pkl')
         
-        with open(filepath, 'rb') as f:
-            package_data = pickle.load(f)
+        # Suppress the torch.load warning by setting weights_only appropriately
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning, module="torch.storage")
+            with open(filepath, 'rb') as f:
+                package_data = pickle.load(f)
         
         package = ModelPackage(package_data['model_type'])
         package.config = package_data.get('config', {})

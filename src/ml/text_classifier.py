@@ -600,8 +600,6 @@ class EnhancedAIHumanTextClassifier:
         self.word_vectorizer = package.word_vectorizer
         self.char_vectorizer = package.char_vectorizer
         self.scaler = package.scaler
-        
-        print(f"Enhanced model loaded from consolidated package: {model_path}")
     
     def plot_training_history(self, history: Dict[str, List[float]], save_path: Optional[str] = None):
         """Plot training history."""

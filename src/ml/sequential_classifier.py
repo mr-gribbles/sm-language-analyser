@@ -224,6 +224,38 @@ class SequentialTextClassifier:
             self.model = SequentialClassifierNetwork(len(self.word_to_idx)).to(self.device)
             self.model.load_state_dict(checkpoint['model_state_dict'])
 
+    def predict(self, texts: List[str]) -> Tuple[np.ndarray, np.ndarray]:
+        """Predict whether texts are AI-generated or human-written.
+        
+        Args:
+            texts: List of text strings to classify.
+            
+        Returns:
+            Tuple of (predictions, probabilities) where:
+            - predictions: numpy array of 0s (human) and 1s (AI)
+            - probabilities: numpy array of prediction probabilities
+        """
+        if self.model is None:
+            raise ValueError("Model not trained. Call train_from_files() first.")
+        
+        sequences = self.texts_to_sequences(texts)
+        padded_sequences = pad_sequence(sequences, batch_first=True, padding_value=self.word_to_idx['<pad>'])[:, :self.max_len]
+        
+        self.model.eval()
+        predictions = []
+        probabilities = []
+        
+        with torch.no_grad():
+            seq = padded_sequences.to(self.device)
+            outputs = self.model(seq)
+            probs = torch.sigmoid(outputs).cpu().numpy().flatten()
+            preds = (probs > 0.5).astype(int)
+            
+            predictions.extend(preds)
+            probabilities.extend(probs)
+        
+        return np.array(predictions), np.array(probabilities)
+
     def plot_confusion_matrix(self, confusion_matrix: np.ndarray, save_path: Optional[str] = None):
         """Plot confusion matrix."""
         plt.figure(figsize=(8, 6))
