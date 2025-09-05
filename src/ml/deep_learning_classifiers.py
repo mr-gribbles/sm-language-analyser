@@ -552,6 +552,39 @@ class DeepLearningTextClassifier:
         
         return ModelSerializer.save_model_package(package, model_path)
     
+    def save_model_with_metrics(self, model_path: str, performance_metrics: Dict[str, Any]):
+        """Save the trained model with comprehensive performance metrics."""
+        if self.model is None:
+            raise ValueError("No model to save. Train the model first.")
+        
+        # Create model package
+        package = ModelPackage('deep_learning')
+        package.add_model(self.model)
+        
+        # Add traditional feature components
+        if self.tfidf_vectorizer is not None:
+            package.add_word_vectorizer(self.tfidf_vectorizer)
+        if self.scaler is not None:
+            package.add_scaler(self.scaler)
+        
+        # Add configuration
+        config = {
+            'model_type': self.model_type,
+            'max_features': self.max_features,
+            'max_seq_len': self.max_seq_len,
+            'ngram_range': self.ngram_range,
+            'word_to_idx': self.word_to_idx,
+            'vocab_size': len(self.word_to_idx) if self.word_to_idx else 0,
+            'model_architecture': 'DeepLearningTextClassifier'
+        }
+        package.add_config(config)
+        
+        # Add performance metrics
+        package.add_performance_metrics(performance_metrics)
+        
+        # Save consolidated package
+        return ModelSerializer.save_model_package(package, model_path)
+    
     def load_model(self, model_path: str):
         """Load a trained model and preprocessing components."""
         package = ModelSerializer.load_model_package(model_path, self.device)

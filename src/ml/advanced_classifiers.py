@@ -897,6 +897,45 @@ class AdvancedTextClassifier:
         
         return ModelSerializer.save_model_package(package, model_path)
     
+    def save_model_with_metrics(self, model_path: str, performance_metrics: Dict[str, Any]):
+        """Save the trained model with comprehensive performance metrics."""
+        if self.is_anomaly_detector:
+            if self.human_model is None or self.ai_model is None:
+                raise ValueError("No anomaly detection models to save. Train the models first.")
+        else:
+            if self.model is None:
+                raise ValueError("No model to save. Train the model first.")
+        
+        # Create model package
+        package = ModelPackage('advanced')
+        
+        # Add the model(s)
+        if self.is_anomaly_detector:
+            package.add_model({'human_model': self.human_model, 'ai_model': self.ai_model})
+        else:
+            package.add_model(self.model)
+        
+        package.add_word_vectorizer(self.word_vectorizer)
+        package.add_char_vectorizer(self.char_vectorizer)
+        package.add_scaler(self.scaler)
+        
+        # Add configuration
+        config = {
+            'classifier_type': self.classifier_type,
+            'max_features': self.max_features,
+            'ngram_range': self.ngram_range,
+            'use_hyperparameter_tuning': self.use_hyperparameter_tuning,
+            'is_anomaly_detector': self.is_anomaly_detector,
+            'model_architecture': 'AdvancedTextClassifier'
+        }
+        package.add_config(config)
+        
+        # Add performance metrics
+        package.add_performance_metrics(performance_metrics)
+        
+        # Save consolidated package
+        return ModelSerializer.save_model_package(package, model_path)
+    
     def load_model(self, model_path: str):
         """Load a trained model and preprocessing components."""
         package = ModelSerializer.load_model_package(model_path)

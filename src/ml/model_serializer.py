@@ -16,6 +16,8 @@ class ModelPackage:
         self.scaler = None
         self.config = {}
         self.metadata = {}
+        self.performance_metrics = {}
+        self.training_history = {}
     
     def add_model(self, model):
         """Add the main model."""
@@ -40,6 +42,14 @@ class ModelPackage:
     def add_metadata(self, metadata: Dict[str, Any]):
         """Add metadata dictionary."""
         self.metadata = metadata
+    
+    def add_performance_metrics(self, metrics: Dict[str, Any]):
+        """Add comprehensive performance metrics."""
+        self.performance_metrics = metrics
+    
+    def add_training_history(self, history: Dict[str, Any]):
+        """Add training history and additional data."""
+        self.training_history = history
 
 
 class ModelSerializer:
@@ -60,6 +70,8 @@ class ModelSerializer:
             'model_type': package.model_type,
             'config': package.config,
             'metadata': package.metadata,
+            'performance_metrics': package.performance_metrics,
+            'training_history': package.training_history,
             'word_vectorizer': package.word_vectorizer,
             'char_vectorizer': package.char_vectorizer,
             'scaler': package.scaler
@@ -108,6 +120,8 @@ class ModelSerializer:
         package = ModelPackage(package_data['model_type'])
         package.config = package_data.get('config', {})
         package.metadata = package_data.get('metadata', {})
+        package.performance_metrics = package_data.get('performance_metrics', {})
+        package.training_history = package_data.get('training_history', {})
         package.word_vectorizer = package_data.get('word_vectorizer')
         package.char_vectorizer = package_data.get('char_vectorizer')
         package.scaler = package_data.get('scaler')

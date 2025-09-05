@@ -583,6 +583,32 @@ class EnhancedAIHumanTextClassifier:
         # Save consolidated package
         return ModelSerializer.save_model_package(package, model_path)
     
+    def save_model_with_metrics(self, model_path: str, performance_metrics: Dict[str, Any]):
+        """Save the trained model with comprehensive performance metrics."""
+        if self.model is None:
+            raise ValueError("No model to save. Train the model first.")
+        
+        # Create model package
+        package = ModelPackage('enhanced')
+        package.add_model(self.model)
+        package.add_word_vectorizer(self.word_vectorizer)
+        package.add_char_vectorizer(self.char_vectorizer)
+        package.add_scaler(self.scaler)
+        
+        # Add configuration
+        config = {
+            'input_dim': self.model.input_layer.in_features,
+            'max_features': self.max_features,
+            'ngram_range': self.ngram_range
+        }
+        package.add_config(config)
+        
+        # Add performance metrics
+        package.add_performance_metrics(performance_metrics)
+        
+        # Save consolidated package
+        return ModelSerializer.save_model_package(package, model_path)
+    
     def load_model(self, model_path: str):
         """Load a trained model and preprocessing components from a consolidated file."""
         # Load consolidated package

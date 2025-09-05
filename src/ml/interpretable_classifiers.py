@@ -535,6 +535,34 @@ class InterpretableTextClassifier:
         
         return ModelSerializer.save_model_package(package, model_path)
     
+    def save_model_with_metrics(self, model_path: str, performance_metrics: Dict[str, Any]):
+        """Save the trained model with comprehensive performance metrics."""
+        if self.model is None:
+            raise ValueError("No model to save. Train the model first.")
+        
+        # Create model package
+        package = ModelPackage('interpretable')
+        package.add_model(self.model)
+        package.add_word_vectorizer(self.word_vectorizer)
+        package.add_char_vectorizer(self.char_vectorizer)
+        if self.scaler is not None:
+            package.add_scaler(self.scaler)
+        
+        # Add configuration
+        config = {
+            'classifier_type': self.classifier_type,
+            'max_features': self.max_features,
+            'use_hyperparameter_tuning': self.use_hyperparameter_tuning,
+            'model_architecture': 'InterpretableTextClassifier'
+        }
+        package.add_config(config)
+        
+        # Add performance metrics
+        package.add_performance_metrics(performance_metrics)
+        
+        # Save consolidated package
+        return ModelSerializer.save_model_package(package, model_path)
+    
     def load_model(self, model_path: str):
         """Load a trained model and preprocessing components."""
         package = ModelSerializer.load_model_package(model_path)

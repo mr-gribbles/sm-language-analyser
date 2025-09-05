@@ -198,6 +198,30 @@ class SequentialTextClassifier:
         })
         
         return ModelSerializer.save_model_package(package, model_path)
+    
+    def save_model_with_metrics(self, model_path: str, performance_metrics: Dict[str, Any]):
+        """Save the trained model with comprehensive performance metrics."""
+        if self.model is None:
+            raise ValueError("No model to save. Train the model first.")
+        
+        # Create model package
+        package = ModelPackage('sequential')
+        package.add_model(self.model)
+        
+        # Add configuration
+        config = {
+            'word_to_idx': self.word_to_idx,
+            'vocab_size': self.vocab_size,
+            'max_len': self.max_len,
+            'model_architecture': 'SequentialClassifierNetwork'
+        }
+        package.add_config(config)
+        
+        # Add performance metrics
+        package.add_performance_metrics(performance_metrics)
+        
+        # Save consolidated package
+        return ModelSerializer.save_model_package(package, model_path)
 
     def load_model(self, model_path: str):
         """Load a trained model and preprocessing components."""

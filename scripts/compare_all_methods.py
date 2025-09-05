@@ -590,12 +590,31 @@ def train_single_method(method_type: str, method_name: str,
                 else:
                     test_f1 = 0.0
             
-            # Save model automatically
+            # Save model automatically with comprehensive metrics
             if save_model and model_save_path and classifier:
                 try:
                     model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved neural network model to {model_path}")
+                    
+                    # Create comprehensive metrics for saving
+                    comprehensive_metrics = {
+                        'test_accuracy': result['test_accuracy'],
+                        'test_precision': result['test_precision'],
+                        'test_recall': result['test_recall'],
+                        'test_f1': test_f1,
+                        'test_auc': result.get('test_auc', 0.0),
+                        'feature_count': result['feature_count'],
+                        'training_time': training_time,
+                        'cv_mean': 0.0,  # Neural network doesn't use CV
+                        'cv_std': 0.0,
+                        'confusion_matrix': result['confusion_matrix'].tolist() if hasattr(result['confusion_matrix'], 'tolist') else result['confusion_matrix'],
+                        'method': f'{method_type.title()}: {method_name}',
+                        'model_type': method_type,
+                        'classifier_name': method_name
+                    }
+                    
+                    # Save model with metrics
+                    classifier.save_model_with_metrics(model_path, comprehensive_metrics)
+                    print(f"Saved neural network model with metrics to {model_path}")
                 except Exception as e:
                     print(f"Failed to save neural network model: {e}")
             
@@ -1108,51 +1127,59 @@ def main():
     parser.add_argument('--classical-methods', nargs='+', 
                        choices=['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
                                'naive_bayes', 'knn', 'decision_tree', 'adaboost'],
-                       default=['random_forest', 'logistic_regression', 'gradient_boosting'],
-                       help='Classical ML methods to test')
+                       default=['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
+                               'naive_bayes', 'knn', 'decision_tree', 'adaboost'],
+                       help='Classical ML methods to test (default: all methods)')
     
     # Ensemble methods to test
     parser.add_argument('--ensemble-methods', nargs='+',
                        choices=['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
                                'catboost', 'extra_trees', 'custom_ensemble'],
-                       default=['voting', 'extra_trees'],
-                       help='Ensemble methods to test')
+                       default=['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
+                               'catboost', 'extra_trees', 'custom_ensemble'],
+                       help='Ensemble methods to test (default: all methods)')
     
     # Deep learning methods to test
     parser.add_argument('--deep-learning-methods', nargs='+',
                        choices=['cnn', 'transformer', 'attention_bilstm'],
-                       default=['cnn'],
-                       help='Deep learning methods to test')
+                       default=['cnn', 'transformer', 'attention_bilstm'],
+                       help='Deep learning methods to test (default: all methods)')
     
     # Probabilistic methods to test
     parser.add_argument('--probabilistic-methods', nargs='+',
                        choices=['gaussian_nb', 'bernoulli_nb', 'multinomial_nb', 'complement_nb', 
                                'categorical_nb', 'hmm', 'gaussian_mixture'],
-                       default=['gaussian_nb', 'bernoulli_nb'],
-                       help='Probabilistic methods to test')
+                       default=['gaussian_nb', 'bernoulli_nb', 'multinomial_nb', 'complement_nb', 
+                               'categorical_nb', 'hmm', 'gaussian_mixture'],
+                       help='Probabilistic methods to test (default: all methods)')
     
     # Manifold learning methods to test
     parser.add_argument('--manifold-methods', nargs='+',
                        choices=['pca', 'tsne', 'isomap', 'lle', 'spectral_embedding', 
                                'mds', 'ica', 'factor_analysis', 'truncated_svd'],
-                       default=['pca', 'tsne'],
-                       help='Manifold learning methods to test')
+                       default=['pca', 'tsne', 'isomap', 'lle', 'spectral_embedding', 
+                               'mds', 'ica', 'factor_analysis', 'truncated_svd'],
+                       help='Manifold learning methods to test (default: all methods)')
     
     # Advanced methods to test
     parser.add_argument('--advanced-methods', nargs='+',
                        choices=['isolation_forest', 'one_class_svm', 'local_outlier_factor', 
                                'elliptic_envelope', 'sgd', 'passive_aggressive', 'perceptron', 
                                'ridge', 'lasso', 'elastic_net', 'huber', 'quantile', 'tweedie'],
-                       default=['isolation_forest', 'sgd'],
-                       help='Advanced methods to test')
+                       default=['isolation_forest', 'one_class_svm', 'local_outlier_factor', 
+                               'elliptic_envelope', 'sgd', 'passive_aggressive', 'perceptron', 
+                               'ridge', 'lasso', 'elastic_net', 'huber', 'quantile', 'tweedie'],
+                       help='Advanced methods to test (default: all methods)')
     
     # Interpretable methods to test
     parser.add_argument('--interpretable-methods', nargs='+',
                        choices=['linear_regression', 'lasso_regression', 'ridge_regression', 
                                'elastic_net_regression', 'decision_tree_classifier', 
                                'extra_tree_classifier', 'gaussian_nb_classifier'],
-                       default=['linear_regression', 'decision_tree_classifier'],
-                       help='Interpretable methods to test')
+                       default=['linear_regression', 'lasso_regression', 'ridge_regression', 
+                               'elastic_net_regression', 'decision_tree_classifier', 
+                               'extra_tree_classifier', 'gaussian_nb_classifier'],
+                       help='Interpretable methods to test (default: all methods)')
     
     # Output options
     parser.add_argument('--output-file', type=str, default='comparison_results_safe.json',
