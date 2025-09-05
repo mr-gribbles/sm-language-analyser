@@ -301,7 +301,7 @@ class EnsembleTextClassifier:
             
         elif self.ensemble_type == 'bagging':
             classifier = BaggingClassifier(
-                base_estimator=RandomForestClassifier(n_estimators=50, random_state=42),
+                estimator=RandomForestClassifier(n_estimators=50, random_state=42),
                 random_state=42, n_jobs=-1
             )
             param_grid = {
@@ -311,12 +311,12 @@ class EnsembleTextClassifier:
             }
             
         elif self.ensemble_type == 'stacking':
-            # Stacking classifier with diverse base estimators
+            # Stacking classifier with diverse base estimators (removed ComplementNB due to negative value issues)
             base_estimators = [
                 ('rf', RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)),
                 ('svm', SVC(probability=True, random_state=42)),
                 ('gb', GradientBoostingClassifier(random_state=42)),
-                ('nb', ComplementNB())
+                ('lr', LogisticRegression(random_state=42, max_iter=1000))
             ]
             
             classifier = StackingClassifier(
@@ -329,6 +329,7 @@ class EnsembleTextClassifier:
                 'rf__max_depth': [10, 20],
                 'svm__C': [1, 10],
                 'gb__n_estimators': [100, 200],
+                'lr__C': [1, 10],
                 'final_estimator__C': [1, 10]
             }
             

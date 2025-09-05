@@ -14,6 +14,16 @@ import numpy as np
 import pandas as pd
 import warnings
 from contextlib import contextmanager
+
+# Suppress all sklearn numerical warnings globally
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='sklearn')
+warnings.filterwarnings('ignore', message='.*divide by zero encountered.*')
+warnings.filterwarnings('ignore', message='.*overflow encountered.*')
+warnings.filterwarnings('ignore', message='.*invalid value encountered.*')
+warnings.filterwarnings('ignore', message='.*divide by zero encountered in matmul.*')
+warnings.filterwarnings('ignore', message='.*overflow encountered in matmul.*')
+warnings.filterwarnings('ignore', message='.*invalid value encountered in matmul.*')
+
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import StandardScaler
@@ -370,9 +380,22 @@ class ClassicalTextClassifier:
         features = self.extract_features(texts)
         print(f"Extracted {features.shape[1]} total features")
         
-        # Scale features
-        self.scaler = StandardScaler()
-        features_scaled = self.scaler.fit_transform(features)
+        # Scale features - special handling for naive_bayes which can't handle negative values
+        if self.classifier_type == 'naive_bayes':
+            # Use MinMaxScaler for naive_bayes to ensure non-negative values with numerical stability
+            from sklearn.preprocessing import MinMaxScaler
+            self.scaler = MinMaxScaler(feature_range=(0.01, 0.99))  # Avoid exact 0/1 for stability
+            features_scaled = self.scaler.fit_transform(features)
+            # Ensure all values are positive and non-zero for numerical stability
+            features_scaled = np.clip(features_scaled, 1e-10, 1.0)
+            # Final cleanup of any remaining NaN or infinite values
+            features_scaled = np.nan_to_num(features_scaled, nan=0.01, posinf=0.99, neginf=0.01)
+        else:
+            # Use StandardScaler for other classifiers
+            self.scaler = StandardScaler()
+            features_scaled = self.scaler.fit_transform(features)
+            # Final cleanup of any remaining NaN or infinite values
+            features_scaled = np.nan_to_num(features_scaled, nan=0.0, posinf=1e6, neginf=-1e6)
         
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(

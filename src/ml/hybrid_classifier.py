@@ -264,6 +264,10 @@ class HybridTextClassifier:
             # Try consolidated format first
             package = ModelSerializer.load_model_package(model_path)
             
+            # Check if model state_dict is None
+            if package.model is None:
+                raise ValueError("Model state_dict is None - model may not have been saved properly")
+            
             self.word_to_idx = package.metadata['word_to_idx']
             self.vocab_size = package.metadata['vocab_size']
             self.max_len = package.metadata['max_len']
@@ -276,25 +280,28 @@ class HybridTextClassifier:
             self.char_vectorizer = package.char_vectorizer
             self.scaler = package.scaler
             
-        except (FileNotFoundError, KeyError):
+        except (FileNotFoundError, KeyError, ValueError) as e:
             # Fallback to legacy format
-            model_path = Path(model_path)
-            checkpoint = torch.load(f"{model_path}_hybrid_model.pth", map_location=self.device, weights_only=True)
-            
-            self.word_to_idx = checkpoint['word_to_idx']
-            self.vocab_size = checkpoint['vocab_size']
-            self.max_len = checkpoint['max_len']
-            self.n_features = checkpoint['n_features']
-            
-            self.model = HybridClassifierNetwork(len(self.word_to_idx), self.n_features).to(self.device)
-            self.model.load_state_dict(checkpoint['model_state_dict'])
-            
-            with open(f"{model_path}_hybrid_word_vectorizer.pkl", 'rb') as f:
-                self.word_vectorizer = pickle.load(f)
-            with open(f"{model_path}_hybrid_char_vectorizer.pkl", 'rb') as f:
-                self.char_vectorizer = pickle.load(f)
-            with open(f"{model_path}_hybrid_scaler.pkl", 'rb') as f:
-                self.scaler = pickle.load(f)
+            try:
+                model_path = Path(model_path)
+                checkpoint = torch.load(f"{model_path}_hybrid_model.pth", map_location=self.device, weights_only=True)
+                
+                self.word_to_idx = checkpoint['word_to_idx']
+                self.vocab_size = checkpoint['vocab_size']
+                self.max_len = checkpoint['max_len']
+                self.n_features = checkpoint['n_features']
+                
+                self.model = HybridClassifierNetwork(len(self.word_to_idx), self.n_features).to(self.device)
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+                
+                with open(f"{model_path}_hybrid_word_vectorizer.pkl", 'rb') as f:
+                    self.word_vectorizer = pickle.load(f)
+                with open(f"{model_path}_hybrid_char_vectorizer.pkl", 'rb') as f:
+                    self.char_vectorizer = pickle.load(f)
+                with open(f"{model_path}_hybrid_scaler.pkl", 'rb') as f:
+                    self.scaler = pickle.load(f)
+            except Exception as legacy_error:
+                raise ValueError(f"Cannot load model: expected state_dict or compatible model object, got <class 'NoneType'>. Original error: {e}, Legacy error: {legacy_error}")
 
     def predict(self, texts: List[str]) -> Tuple[np.ndarray, np.ndarray]:
         """Predict whether texts are AI-generated or human-written."""

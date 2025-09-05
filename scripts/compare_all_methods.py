@@ -1,8 +1,8 @@
-"""Memory-safe comprehensive comparison script for all ML methods.
+"""Optimized comprehensive comparison script for all ML methods.
 
 This script trains and compares neural networks, classical ML, and ensemble methods
-for AI vs Human text detection using the same training/testing pipeline, but with
-memory-efficient processing to prevent system crashes.
+for AI vs Human text detection using shared feature extraction for efficiency.
+Features are extracted once and reused across all compatible models.
 """
 import sys
 import os
@@ -10,8 +10,24 @@ import argparse
 import json
 import time
 import gc
+import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
+import warnings
+
+# Suppress all sklearn numerical warnings globally
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='sklearn')
+warnings.filterwarnings('ignore', message='.*divide by zero encountered.*')
+warnings.filterwarnings('ignore', message='.*overflow encountered.*')
+warnings.filterwarnings('ignore', message='.*invalid value encountered.*')
+warnings.filterwarnings('ignore', message='.*divide by zero encountered in matmul.*')
+warnings.filterwarnings('ignore', message='.*overflow encountered in matmul.*')
+warnings.filterwarnings('ignore', message='.*invalid value encountered in matmul.*')
+
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -28,25 +44,507 @@ from src.ml.advanced_classifiers import AdvancedTextClassifier
 from src.ml.interpretable_classifiers import InterpretableTextClassifier
 
 
-def train_single_method(method_type: str, method_name: str, human_file: str,
-                       ai_file: str, test_size: float = 0.2,
-                       validation_size: float = 0.15,
+class SharedFeatureExtractor:
+    """Shared feature extraction for all compatible models."""
+    
+    def __init__(self, max_features: int = 15000, ngram_range: Tuple[int, int] = (1, 3)):
+        """Initialize the shared feature extractor."""
+        self.max_features = max_features
+        self.ngram_range = ngram_range
+        self.word_vectorizer = None
+        self.char_vectorizer = None
+        self.standard_scaler = None
+        self.minmax_scaler = None
+        
+    def load_corpus_files(self, human_file: str, ai_file: str) -> Tuple[List[str], List[int]]:
+        """Load and prepare training data."""
+        texts = []
+        labels = []
+        
+        # Load human-written texts (label = 0)
+        print(f"Loading human texts from: {human_file}")
+        with open(human_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    record = json.loads(line.strip())
+                    if 'cleaned_text' in record['original_content']:
+                        text = record['original_content']['cleaned_text']
+                    elif 'cleaned_selftext' in record['original_content']:
+                        text = record['original_content']['cleaned_selftext']
+                    else:
+                        text = record['original_content'].get('raw_text', 
+                              record['original_content'].get('raw_selftext', ''))
+                    
+                    if text and len(text.strip()) > 20:
+                        texts.append(text.strip())
+                        labels.append(0)  # Human-written
+                except (json.JSONDecodeError, KeyError) as e:
+                    continue
+        
+        # Load AI-rewritten texts (label = 1)
+        print(f"Loading AI texts from: {ai_file}")
+        with open(ai_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    record = json.loads(line.strip())
+                    if record.get('llm_transformation') and record['llm_transformation'].get('rewritten_text'):
+                        text = record['llm_transformation']['rewritten_text']
+                        if text and len(text.strip()) > 20:
+                            texts.append(text.strip())
+                            labels.append(1)  # AI-generated
+                except (json.JSONDecodeError, KeyError) as e:
+                    continue
+        
+        print(f"Loaded {len(texts)} texts total:")
+        print(f"  Human texts: {labels.count(0)}")
+        print(f"  AI texts: {labels.count(1)}")
+        
+        return texts, labels
+    
+    def extract_linguistic_features(self, texts: List[str]) -> np.ndarray:
+        """Extract linguistic features from texts with numerical stability fixes."""
+        features = []
+        
+        for text in texts:
+            text_features = []
+            
+            # Basic statistics with safe division
+            text_len = len(text)
+            words = text.lower().split()
+            word_count = len(words)
+            
+            text_features.append(text_len)  # Text length
+            text_features.append(word_count)  # Word count
+            text_features.append(word_count / max(text_len, 1))  # Word density (safe division)
+            
+            # Sentence statistics with safe operations
+            sentences = [s.strip() for s in text.split('.') if s.strip()]
+            sentence_count = max(len(sentences), 1)  # Avoid division by zero
+            text_features.append(sentence_count)  # Sentence count
+            
+            # Average words per sentence with safe calculation
+            if sentences:
+                sentence_lengths = [len(s.split()) for s in sentences]
+                avg_words_per_sentence = np.mean(sentence_lengths) if sentence_lengths else 0
+            else:
+                avg_words_per_sentence = 0
+            text_features.append(avg_words_per_sentence)
+            
+            # Character-level features with safe division
+            if text_len > 0:
+                text_features.append(sum(1 for c in text if c.isupper()) / text_len)  # Uppercase ratio
+                text_features.append(sum(1 for c in text if c.islower()) / text_len)  # Lowercase ratio
+                text_features.append(sum(1 for c in text if c.isdigit()) / text_len)  # Digit ratio
+                text_features.append(sum(1 for c in text if c in '.,!?;:') / text_len)  # Punctuation ratio
+            else:
+                text_features.extend([0, 0, 0, 0])
+            
+            # Vocabulary complexity with safe division
+            unique_words = set(words)
+            text_features.append(len(unique_words) / max(word_count, 1))  # Lexical diversity (safe division)
+            
+            # Average word length with safe calculation
+            if words:
+                avg_word_len = np.mean([len(word) for word in words])
+                # Clip extreme values to prevent numerical issues
+                avg_word_len = np.clip(avg_word_len, 0, 50)
+            else:
+                avg_word_len = 0
+            text_features.append(avg_word_len)
+            
+            # Readability approximation (Flesch-like) with safe calculations
+            avg_sentence_length = word_count / sentence_count  # Already safe due to max(1) above
+            if words:
+                syllable_counts = [max(1, len(re.findall(r'[aeiouAEIOU]', word))) for word in words]
+                avg_syllables = np.mean(syllable_counts)
+                # Clip to reasonable range to prevent extreme values
+                avg_syllables = np.clip(avg_syllables, 1, 10)
+            else:
+                avg_syllables = 1
+            
+            flesch_score = 206.835 - (1.015 * avg_sentence_length) - (84.6 * avg_syllables)
+            # Clip Flesch score to reasonable range
+            flesch_score = np.clip(flesch_score, -100, 200)
+            text_features.append(flesch_score)
+            
+            # Function word ratios with safe division
+            function_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'must'}
+            function_word_count = sum(1 for word in words if word.lower() in function_words)
+            text_features.append(function_word_count / max(word_count, 1))  # Safe division
+            
+            # Repetition patterns with safe division
+            if len(words) > 1:
+                bigrams = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
+                unique_bigrams = set(bigrams)
+                bigram_diversity = len(unique_bigrams) / len(bigrams)
+            else:
+                bigram_diversity = 0
+            text_features.append(bigram_diversity)
+            
+            # Ensure all features are finite and not NaN
+            text_features = [np.clip(f, -1e6, 1e6) if np.isfinite(f) else 0 for f in text_features]
+            features.append(text_features)
+        
+        feature_array = np.array(features)
+        
+        # Final safety check: replace any remaining NaN or infinite values
+        feature_array = np.nan_to_num(feature_array, nan=0.0, posinf=1e6, neginf=-1e6)
+        
+        return feature_array
+    
+    def extract_features(self, texts: List[str], reduced_features: bool = True) -> np.ndarray:
+        """Extract comprehensive features with numerical stability improvements."""
+        max_features = self.max_features // 2 if reduced_features else self.max_features
+        ngram_range = (1, 2) if reduced_features else self.ngram_range
+        
+        # Word-level TF-IDF features
+        if self.word_vectorizer is None:
+            self.word_vectorizer = TfidfVectorizer(
+                max_features=max_features // 2,
+                ngram_range=ngram_range,
+                stop_words='english',
+                lowercase=True,
+                strip_accents='unicode',
+                token_pattern=r'\b[a-zA-Z]{2,}\b',
+                min_df=5,
+                max_df=0.8,
+                sublinear_tf=True,
+                use_idf=True,
+                smooth_idf=True,
+                norm='l2'
+            )
+            word_features = self.word_vectorizer.fit_transform(texts).toarray()
+        else:
+            word_features = self.word_vectorizer.transform(texts).toarray()
+        
+        # Character-level TF-IDF features
+        if self.char_vectorizer is None:
+            self.char_vectorizer = TfidfVectorizer(
+                max_features=max_features // 2,
+                analyzer='char',
+                ngram_range=(2, 4),
+                lowercase=True,
+                min_df=10,
+                max_df=0.85,
+                sublinear_tf=True,
+                use_idf=True,
+                smooth_idf=True,
+                norm='l2'
+            )
+            char_features = self.char_vectorizer.fit_transform(texts).toarray()
+        else:
+            char_features = self.char_vectorizer.transform(texts).toarray()
+        
+        # Linguistic features
+        linguistic_features = self.extract_linguistic_features(texts)
+        
+        # Ensure all feature matrices are clean
+        word_features = np.nan_to_num(word_features, nan=0.0, posinf=1e6, neginf=-1e6)
+        char_features = np.nan_to_num(char_features, nan=0.0, posinf=1e6, neginf=-1e6)
+        
+        # Combine all features
+        combined_features = np.hstack([word_features, char_features, linguistic_features])
+        
+        # Final safety check for the combined features
+        combined_features = np.nan_to_num(combined_features, nan=0.0, posinf=1e6, neginf=-1e6)
+        
+        return combined_features
+    
+    def get_scaled_features(self, features: np.ndarray, scaler_type: str = 'standard') -> np.ndarray:
+        """Get scaled features using the appropriate scaler with numerical stability."""
+        # Ensure features are clean before scaling
+        features = np.nan_to_num(features, nan=0.0, posinf=1e6, neginf=-1e6)
+        
+        if scaler_type == 'minmax':
+            if self.minmax_scaler is None:
+                self.minmax_scaler = MinMaxScaler(feature_range=(0.01, 0.99))  # Avoid exact 0/1 for stability
+                scaled_features = self.minmax_scaler.fit_transform(features)
+            else:
+                scaled_features = self.minmax_scaler.transform(features)
+        else:  # standard
+            if self.standard_scaler is None:
+                self.standard_scaler = StandardScaler(with_mean=True, with_std=True)
+                scaled_features = self.standard_scaler.fit_transform(features)
+            else:
+                scaled_features = self.standard_scaler.transform(features)
+        
+        # Final cleanup of scaled features
+        scaled_features = np.nan_to_num(scaled_features, nan=0.0, posinf=1e6, neginf=-1e6)
+        
+        # For naive_bayes, ensure all values are positive and non-zero
+        if scaler_type == 'minmax':
+            scaled_features = np.clip(scaled_features, 1e-10, 1.0)
+        
+        return scaled_features
+
+
+def train_feature_based_method(classifier_class, method_type: str, method_name: str,
+                              X_train: np.ndarray, X_val: np.ndarray, X_test: np.ndarray,
+                              y_train: np.ndarray, y_val: np.ndarray, y_test: np.ndarray,
+                              reduced_features: bool, reduced_cv: bool,
+                              feature_extractor: SharedFeatureExtractor,
+                              save_model: bool, model_save_path: str,
+                              start_time: float) -> Dict[str, Any]:
+    """Helper function to train feature-based methods with shared features."""
+    from sklearn.model_selection import cross_val_score
+    from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
+    
+    # Initialize classifier with appropriate parameters
+    if method_type == 'classical':
+        classifier = classifier_class(
+            classifier_type=method_name,
+            max_features=10000 if reduced_features else 15000,
+            ngram_range=(1, 2) if reduced_features else (1, 3),
+            use_hyperparameter_tuning=not reduced_features
+        )
+    elif method_type == 'ensemble':
+        classifier = classifier_class(
+            ensemble_type=method_name,
+            max_features=8000 if reduced_features else 15000,
+            ngram_range=(1, 2) if reduced_features else (1, 3),
+            use_hyperparameter_tuning=not reduced_features
+        )
+    else:  # probabilistic, manifold, advanced, interpretable
+        classifier = classifier_class(
+            classifier_type=method_name,
+            max_features=10000 if reduced_features else 15000,
+            ngram_range=(1, 2) if reduced_features else (1, 3),
+            use_hyperparameter_tuning=not reduced_features
+        )
+    
+    # Set the feature extractor components from shared extractor
+    if feature_extractor:
+        classifier.word_vectorizer = feature_extractor.word_vectorizer
+        classifier.char_vectorizer = feature_extractor.char_vectorizer
+        if method_name in ['naive_bayes', 'gaussian_nb', 'bernoulli_nb', 'multinomial_nb', 'complement_nb', 'categorical_nb', 'gaussian_nb_classifier']:
+            classifier.scaler = feature_extractor.minmax_scaler
+        else:
+            classifier.scaler = feature_extractor.standard_scaler
+    
+    # Get model and parameters
+    if method_type == 'classical':
+        model, param_grid = classifier._get_classifier_and_params()
+    elif method_type == 'ensemble':
+        model, param_grid = classifier._get_ensemble_and_params()
+    else:
+        model, param_grid = classifier._get_classifier_and_params()
+    
+    # Special handling for gaussian_mixture to apply numerical stability fixes
+    if method_name == 'gaussian_mixture':
+        from src.ml.probabilistic_classifiers import GaussianMixtureClassifier
+        model = GaussianMixtureClassifier()
+        param_grid = {
+            'n_components': [2, 3, 5, 10],
+            'covariance_type': ['full', 'tied', 'diag', 'spherical']
+        }
+    
+    # Handle anomaly detection methods differently
+    if hasattr(classifier, 'is_anomaly_detector') and classifier.is_anomaly_detector:
+        # For anomaly detectors, we need to use the special training method
+        # Separate training data by class
+        human_indices = np.where(np.array(y_train) == 0)[0]
+        ai_indices = np.where(np.array(y_train) == 1)[0]
+        
+        X_human = X_train[human_indices]
+        X_ai = X_train[ai_indices]
+        
+        # Train separate models for each class
+        if classifier.use_hyperparameter_tuning and param_grid:
+            # Human model
+            from sklearn.model_selection import GridSearchCV
+            grid_search_human = GridSearchCV(
+                model, param_grid, cv=3, scoring='accuracy', n_jobs=-1
+            )
+            grid_search_human.fit(X_human)
+            classifier.human_model = grid_search_human.best_estimator_
+            
+            # AI model
+            from sklearn.base import clone
+            grid_search_ai = GridSearchCV(
+                clone(model), param_grid, cv=3, scoring='accuracy', n_jobs=-1
+            )
+            grid_search_ai.fit(X_ai)
+            classifier.ai_model = grid_search_ai.best_estimator_
+            
+            best_params = {
+                'human_params': grid_search_human.best_params_,
+                'ai_params': grid_search_ai.best_params_
+            }
+        else:
+            # Train with default parameters
+            from sklearn.base import clone
+            classifier.human_model = clone(model)
+            classifier.ai_model = clone(model)
+            
+            classifier.human_model.fit(X_human)
+            classifier.ai_model.fit(X_ai)
+            best_params = {}
+        
+        # Set model to None since we use human_model and ai_model for anomaly detection
+        classifier.model = None
+    else:
+        # Train with or without hyperparameter tuning
+        if classifier.use_hyperparameter_tuning:
+            from sklearn.model_selection import GridSearchCV
+            grid_search = GridSearchCV(
+                model, param_grid, cv=3 if reduced_cv else 5, scoring='accuracy', 
+                n_jobs=-1, verbose=0
+            )
+            grid_search.fit(X_train, y_train)
+            classifier.model = grid_search.best_estimator_
+            best_params = grid_search.best_params_
+        else:
+            model.fit(X_train, y_train)
+            classifier.model = model
+            best_params = {}
+    
+    # Validation and test predictions
+    if hasattr(classifier, 'is_anomaly_detector') and classifier.is_anomaly_detector:
+        # For anomaly detectors, we need to use the anomaly detection prediction logic directly
+        if classifier.classifier_type == 'local_outlier_factor':
+            # LocalOutlierFactor returns -1 for outliers, 1 for inliers
+            human_predictions = classifier.human_model.predict(X_val)  # -1 or 1
+            ai_predictions = classifier.ai_model.predict(X_val)  # -1 or 1
+            
+            # Convert to scores: 1 for inlier (normal), 0 for outlier (anomaly)
+            human_scores = (human_predictions + 1) / 2  # Convert -1,1 to 0,1
+            ai_scores = (ai_predictions + 1) / 2  # Convert -1,1 to 0,1
+            
+            # Predict the class with higher normality score
+            val_predictions = (ai_scores > human_scores).astype(int)
+            
+            # Create probabilities from normalized scores
+            total_scores = human_scores + ai_scores + 1e-8  # Add small epsilon to avoid division by zero
+            val_probabilities = ai_scores / total_scores
+        else:
+            # For other anomaly detectors that have decision_function
+            human_scores = classifier.human_model.decision_function(X_val)
+            ai_scores = classifier.ai_model.decision_function(X_val)
+            
+            # Higher score means more normal for that class
+            # Predict the class with higher normality score
+            val_predictions = (ai_scores > human_scores).astype(int)
+            
+            # Create pseudo-probabilities from scores
+            human_probs = 1 / (1 + np.exp(-human_scores))  # Sigmoid
+            ai_probs = 1 / (1 + np.exp(-ai_scores))
+            total_probs = human_probs + ai_probs
+            val_probabilities = ai_probs / total_probs  # Normalize
+        
+        # Ensure validation predictions are binary (0 or 1)
+        val_predictions = np.clip(val_predictions, 0, 1).astype(int)
+        val_accuracy = accuracy_score(y_val, val_predictions)
+        
+        # Test predictions using the same logic
+        if classifier.classifier_type == 'local_outlier_factor':
+            human_predictions = classifier.human_model.predict(X_test)  # -1 or 1
+            ai_predictions = classifier.ai_model.predict(X_test)  # -1 or 1
+            
+            human_scores = (human_predictions + 1) / 2  # Convert -1,1 to 0,1
+            ai_scores = (ai_predictions + 1) / 2  # Convert -1,1 to 0,1
+            
+            test_predictions = (ai_scores > human_scores).astype(int)
+            
+            total_scores = human_scores + ai_scores + 1e-8
+            test_probabilities = ai_scores / total_scores
+        else:
+            human_scores = classifier.human_model.decision_function(X_test)
+            ai_scores = classifier.ai_model.decision_function(X_test)
+            
+            test_predictions = (ai_scores > human_scores).astype(int)
+            
+            human_probs = 1 / (1 + np.exp(-human_scores))
+            ai_probs = 1 / (1 + np.exp(-ai_scores))
+            total_probs = human_probs + ai_probs
+            test_probabilities = ai_probs / total_probs
+        
+        # Ensure test predictions are binary (0 or 1)
+        test_predictions = np.clip(test_predictions, 0, 1).astype(int)
+        test_accuracy = accuracy_score(y_test, test_predictions)
+        
+        # For anomaly detection, use a simple accuracy score as CV score
+        cv_scores = np.array([test_accuracy])
+    else:
+        # Regular model predictions (classifier.model is not None)
+        val_predictions = classifier.model.predict(X_val)
+        val_probabilities = classifier.model.predict_proba(X_val)[:, 1] if hasattr(classifier.model, 'predict_proba') else None
+        val_accuracy = accuracy_score(y_val, val_predictions)
+        
+        test_predictions = classifier.model.predict(X_test)
+        test_probabilities = classifier.model.predict_proba(X_test)[:, 1] if hasattr(classifier.model, 'predict_proba') else None
+        test_accuracy = accuracy_score(y_test, test_predictions)
+        
+        # Cross-validation score
+        cv_scores = cross_val_score(classifier.model, X_train, y_train, cv=3 if reduced_cv else 5, scoring='accuracy')
+    
+    # Calculate metrics
+    class_report = classification_report(y_test, test_predictions, 
+                                       target_names=['Human', 'AI'], 
+                                       labels=[0, 1], output_dict=True)
+    
+    result = {
+        f'{method_type}_type': method_name,
+        'best_params': best_params,
+        'cv_scores': cv_scores,
+        'cv_mean': cv_scores.mean(),
+        'cv_std': cv_scores.std(),
+        'val_accuracy': val_accuracy,
+        'test_accuracy': test_accuracy,
+        'test_precision': class_report['weighted avg']['precision'],
+        'test_recall': class_report['weighted avg']['recall'],
+        'test_f1': class_report['weighted avg']['f1-score'],
+        'classification_report': class_report,
+        'confusion_matrix': confusion_matrix(y_test, test_predictions),
+        'feature_count': X_train.shape[1]
+    }
+    
+    # Add AUC if probabilities available
+    if test_probabilities is not None:
+        result['test_auc'] = roc_auc_score(y_test, test_probabilities)
+    
+    training_time = time.time() - start_time
+    result['method'] = f'{method_type.title()}: {method_name}'
+    result['training_time'] = training_time
+    
+    # Save model automatically
+    if save_model and model_save_path and classifier:
+        try:
+            model_path = f"{model_save_path}_{method_name}"
+            classifier.save_model(model_path)
+            print(f"Saved {method_type} model to {model_path}")
+        except Exception as e:
+            print(f"Failed to save {method_type} model: {e}")
+    
+    return result
+
+
+def train_single_method(method_type: str, method_name: str, 
+                       X_train: np.ndarray = None, X_val: np.ndarray = None, X_test: np.ndarray = None,
+                       y_train: np.ndarray = None, y_val: np.ndarray = None, y_test: np.ndarray = None,
+                       texts: List[str] = None, labels: List[int] = None,
+                       human_file: str = None, ai_file: str = None,
+                       test_size: float = 0.2, validation_size: float = 0.15,
                        reduced_features: bool = True, reduced_cv: bool = True,
-                       save_model: bool = False,
-                       model_save_path: str = None) -> Dict[str, Any]:
-    """Train a single method with memory-safe settings.
+                       save_model: bool = False, model_save_path: str = None,
+                       feature_extractor: SharedFeatureExtractor = None) -> Dict[str, Any]:
+    """Train a single method with pre-extracted features or file-based training.
     
     Args:
-        method_type: Type of method ('neural', 'classical', 'ensemble').
+        method_type: Type of method ('neural', 'classical', 'ensemble', etc.).
         method_name: Specific method name within the type.
-        human_file: Path to JSONL file with human-written texts.
-        ai_file: Path to JSONL file with AI-generated texts.
+        X_train, X_val, X_test: Pre-extracted feature matrices (optional).
+        y_train, y_val, y_test: Pre-split labels (optional).
+        texts: Raw texts for methods that need them (optional).
+        labels: Labels corresponding to texts (optional).
+        human_file: Path to JSONL file with human-written texts (fallback).
+        ai_file: Path to JSONL file with AI-generated texts (fallback).
         test_size: Proportion of data for testing.
         validation_size: Proportion of training data for validation.
         reduced_features: Whether to use reduced feature set for memory.
         reduced_cv: Whether to use reduced cross-validation folds.
         save_model: Whether to save the trained model.
         model_save_path: Base path for saving models.
+        feature_extractor: Shared feature extractor instance.
         
     Returns:
         Dictionary containing training results and metrics.
@@ -118,66 +616,245 @@ def train_single_method(method_type: str, method_name: str, human_file: str,
             }
             
         elif method_type == 'classical':
-            classifier = ClassicalTextClassifier(
-                classifier_type=method_name,
-                max_features=10000 if reduced_features else 15000,
-                ngram_range=(1, 2) if reduced_features else (1, 3),
-                use_hyperparameter_tuning=not reduced_features  # Skip hyperparameter tuning for speed
-            )
-            
-            result = classifier.train_from_files(
-                human_file=human_file,
-                ai_file=ai_file,
-                test_size=test_size,
-                validation_size=validation_size,
-                cv_folds=3 if reduced_cv else 5  # Reduce CV folds to save memory
-            )
-            
-            training_time = time.time() - start_time
-            result['method'] = f'{method_type.title()}: {method_name}'
-            result['training_time'] = training_time
-            
-            # Save model automatically
-            if save_model and model_save_path and classifier:
-                try:
-                    model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved classical model to {model_path}")
-                except Exception as e:
-                    print(f"Failed to save classical model: {e}")
-            
-            return result
+            # Use pre-extracted features if available
+            if X_train is not None and y_train is not None:
+                from sklearn.model_selection import cross_val_score
+                from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
+                
+                classifier = ClassicalTextClassifier(
+                    classifier_type=method_name,
+                    max_features=10000 if reduced_features else 15000,
+                    ngram_range=(1, 2) if reduced_features else (1, 3),
+                    use_hyperparameter_tuning=not reduced_features
+                )
+                
+                # Set the feature extractor components from shared extractor
+                if feature_extractor:
+                    classifier.word_vectorizer = feature_extractor.word_vectorizer
+                    classifier.char_vectorizer = feature_extractor.char_vectorizer
+                    if method_name == 'naive_bayes':
+                        classifier.scaler = feature_extractor.minmax_scaler
+                    else:
+                        classifier.scaler = feature_extractor.standard_scaler
+                
+                # Get classifier and parameters
+                model, param_grid = classifier._get_classifier_and_params()
+                
+                # Train with or without hyperparameter tuning
+                if classifier.use_hyperparameter_tuning:
+                    from sklearn.model_selection import GridSearchCV
+                    grid_search = GridSearchCV(
+                        model, param_grid, cv=3 if reduced_cv else 5, scoring='accuracy', 
+                        n_jobs=-1, verbose=0
+                    )
+                    grid_search.fit(X_train, y_train)
+                    classifier.model = grid_search.best_estimator_
+                    best_params = grid_search.best_params_
+                else:
+                    model.fit(X_train, y_train)
+                    classifier.model = model
+                    best_params = {}
+                
+                # Validation and test predictions
+                val_predictions = classifier.model.predict(X_val)
+                val_probabilities = classifier.model.predict_proba(X_val)[:, 1] if hasattr(classifier.model, 'predict_proba') else None
+                val_accuracy = accuracy_score(y_val, val_predictions)
+                
+                test_predictions = classifier.model.predict(X_test)
+                test_probabilities = classifier.model.predict_proba(X_test)[:, 1] if hasattr(classifier.model, 'predict_proba') else None
+                test_accuracy = accuracy_score(y_test, test_predictions)
+                
+                # Cross-validation score
+                cv_scores = cross_val_score(classifier.model, X_train, y_train, cv=3 if reduced_cv else 5, scoring='accuracy')
+                
+                # Calculate metrics
+                class_report = classification_report(y_test, test_predictions, 
+                                                   target_names=['Human', 'AI'], output_dict=True)
+                
+                result = {
+                    'classifier_type': method_name,
+                    'best_params': best_params,
+                    'cv_scores': cv_scores,
+                    'cv_mean': cv_scores.mean(),
+                    'cv_std': cv_scores.std(),
+                    'val_accuracy': val_accuracy,
+                    'test_accuracy': test_accuracy,
+                    'test_precision': class_report['weighted avg']['precision'],
+                    'test_recall': class_report['weighted avg']['recall'],
+                    'test_f1': class_report['weighted avg']['f1-score'],
+                    'classification_report': class_report,
+                    'confusion_matrix': confusion_matrix(y_test, test_predictions),
+                    'feature_count': X_train.shape[1]
+                }
+                
+                # Add AUC if probabilities available
+                if test_probabilities is not None:
+                    result['test_auc'] = roc_auc_score(y_test, test_probabilities)
+                
+                training_time = time.time() - start_time
+                result['method'] = f'{method_type.title()}: {method_name}'
+                result['training_time'] = training_time
+                
+                # Save model automatically
+                if save_model and model_save_path and classifier:
+                    try:
+                        model_path = f"{model_save_path}_{method_name}"
+                        classifier.save_model(model_path)
+                        print(f"Saved classical model to {model_path}")
+                    except Exception as e:
+                        print(f"Failed to save classical model: {e}")
+                
+                return result
+            else:
+                # Fallback to file-based training
+                classifier = ClassicalTextClassifier(
+                    classifier_type=method_name,
+                    max_features=10000 if reduced_features else 15000,
+                    ngram_range=(1, 2) if reduced_features else (1, 3),
+                    use_hyperparameter_tuning=not reduced_features
+                )
+                
+                result = classifier.train_from_files(
+                    human_file=human_file,
+                    ai_file=ai_file,
+                    test_size=test_size,
+                    validation_size=validation_size,
+                    cv_folds=3 if reduced_cv else 5
+                )
+                
+                training_time = time.time() - start_time
+                result['method'] = f'{method_type.title()}: {method_name}'
+                result['training_time'] = training_time
+                
+                # Save model automatically
+                if save_model and model_save_path and classifier:
+                    try:
+                        model_path = f"{model_save_path}_{method_name}"
+                        classifier.save_model(model_path)
+                        print(f"Saved classical model to {model_path}")
+                    except Exception as e:
+                        print(f"Failed to save classical model: {e}")
+                
+                return result
             
         elif method_type == 'ensemble':
-            classifier = EnsembleTextClassifier(
-                ensemble_type=method_name,
-                max_features=8000 if reduced_features else 15000,  # Even more reduced for ensembles
-                ngram_range=(1, 2) if reduced_features else (1, 3),
-                use_hyperparameter_tuning=not reduced_features  # Skip hyperparameter tuning for speed
-            )
-            
-            result = classifier.train_from_files(
-                human_file=human_file,
-                ai_file=ai_file,
-                test_size=test_size,
-                validation_size=validation_size,
-                cv_folds=3 if reduced_cv else 5  # Reduce CV folds to save memory
-            )
-            
-            training_time = time.time() - start_time
-            result['method'] = f'{method_type.title()}: {method_name}'
-            result['training_time'] = training_time
-            
-            # Save model automatically
-            if save_model and model_save_path and classifier:
-                try:
-                    model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved ensemble model to {model_path}")
-                except Exception as e:
-                    print(f"Failed to save ensemble model: {e}")
-            
-            return result
+            # Use pre-extracted features if available
+            if X_train is not None and y_train is not None:
+                from sklearn.model_selection import cross_val_score
+                from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
+                
+                classifier = EnsembleTextClassifier(
+                    ensemble_type=method_name,
+                    max_features=8000 if reduced_features else 15000,
+                    ngram_range=(1, 2) if reduced_features else (1, 3),
+                    use_hyperparameter_tuning=not reduced_features
+                )
+                
+                # Set the feature extractor components from shared extractor
+                if feature_extractor:
+                    classifier.word_vectorizer = feature_extractor.word_vectorizer
+                    classifier.char_vectorizer = feature_extractor.char_vectorizer
+                    classifier.scaler = feature_extractor.standard_scaler
+                
+                # Get ensemble and parameters
+                model, param_grid = classifier._get_ensemble_and_params()
+                
+                # Train with or without hyperparameter tuning
+                if classifier.use_hyperparameter_tuning:
+                    from sklearn.model_selection import GridSearchCV
+                    grid_search = GridSearchCV(
+                        model, param_grid, cv=3 if reduced_cv else 5, scoring='accuracy', 
+                        n_jobs=-1, verbose=0
+                    )
+                    grid_search.fit(X_train, y_train)
+                    classifier.model = grid_search.best_estimator_
+                    best_params = grid_search.best_params_
+                else:
+                    model.fit(X_train, y_train)
+                    classifier.model = model
+                    best_params = {}
+                
+                # Validation and test predictions
+                val_predictions = classifier.model.predict(X_val)
+                val_probabilities = classifier.model.predict_proba(X_val)[:, 1] if hasattr(classifier.model, 'predict_proba') else None
+                val_accuracy = accuracy_score(y_val, val_predictions)
+                
+                test_predictions = classifier.model.predict(X_test)
+                test_probabilities = classifier.model.predict_proba(X_test)[:, 1] if hasattr(classifier.model, 'predict_proba') else None
+                test_accuracy = accuracy_score(y_test, test_predictions)
+                
+                # Cross-validation score
+                cv_scores = cross_val_score(classifier.model, X_train, y_train, cv=3 if reduced_cv else 5, scoring='accuracy')
+                
+                # Calculate metrics
+                class_report = classification_report(y_test, test_predictions, 
+                                                   target_names=['Human', 'AI'], output_dict=True)
+                
+                result = {
+                    'ensemble_type': method_name,
+                    'best_params': best_params,
+                    'cv_scores': cv_scores,
+                    'cv_mean': cv_scores.mean(),
+                    'cv_std': cv_scores.std(),
+                    'val_accuracy': val_accuracy,
+                    'test_accuracy': test_accuracy,
+                    'test_precision': class_report['weighted avg']['precision'],
+                    'test_recall': class_report['weighted avg']['recall'],
+                    'test_f1': class_report['weighted avg']['f1-score'],
+                    'classification_report': class_report,
+                    'confusion_matrix': confusion_matrix(y_test, test_predictions),
+                    'feature_count': X_train.shape[1]
+                }
+                
+                # Add AUC if probabilities available
+                if test_probabilities is not None:
+                    result['test_auc'] = roc_auc_score(y_test, test_probabilities)
+                
+                training_time = time.time() - start_time
+                result['method'] = f'{method_type.title()}: {method_name}'
+                result['training_time'] = training_time
+                
+                # Save model automatically
+                if save_model and model_save_path and classifier:
+                    try:
+                        model_path = f"{model_save_path}_{method_name}"
+                        classifier.save_model(model_path)
+                        print(f"Saved ensemble model to {model_path}")
+                    except Exception as e:
+                        print(f"Failed to save ensemble model: {e}")
+                
+                return result
+            else:
+                # Fallback to file-based training
+                classifier = EnsembleTextClassifier(
+                    ensemble_type=method_name,
+                    max_features=8000 if reduced_features else 15000,
+                    ngram_range=(1, 2) if reduced_features else (1, 3),
+                    use_hyperparameter_tuning=not reduced_features
+                )
+                
+                result = classifier.train_from_files(
+                    human_file=human_file,
+                    ai_file=ai_file,
+                    test_size=test_size,
+                    validation_size=validation_size,
+                    cv_folds=3 if reduced_cv else 5
+                )
+                
+                training_time = time.time() - start_time
+                result['method'] = f'{method_type.title()}: {method_name}'
+                result['training_time'] = training_time
+                
+                # Save model automatically
+                if save_model and model_save_path and classifier:
+                    try:
+                        model_path = f"{model_save_path}_{method_name}"
+                        classifier.save_model(model_path)
+                        print(f"Saved ensemble model to {model_path}")
+                    except Exception as e:
+                        print(f"Failed to save ensemble model: {e}")
+                
+                return result
             
         elif method_type == 'sequential':
             classifier = SequentialTextClassifier(
@@ -306,129 +983,68 @@ def train_single_method(method_type: str, method_name: str, human_file: str,
                 'error': None
             }
             
-        elif method_type == 'probabilistic':
-            classifier = ProbabilisticTextClassifier(
-                classifier_type=method_name,
-                max_features=10000 if reduced_features else 15000,
-                ngram_range=(1, 2) if reduced_features else (1, 3),
-                use_hyperparameter_tuning=not reduced_features
-            )
-            
-            result = classifier.train_from_files(
-                human_file=human_file,
-                ai_file=ai_file,
-                test_size=test_size,
-                validation_size=validation_size,
-                cv_folds=3 if reduced_cv else 5
-            )
-            
-            training_time = time.time() - start_time
-            result['method'] = f'{method_type.title()}: {method_name}'
-            result['training_time'] = training_time
-            
-            # Save model automatically
-            if save_model and model_save_path and classifier:
-                try:
-                    model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved probabilistic model to {model_path}")
-                except Exception as e:
-                    print(f"Failed to save probabilistic model: {e}")
-            
-            return result
-            
-        elif method_type == 'manifold':
-            classifier = ManifoldTextClassifier(
-                manifold_type=method_name,
-                max_features=8000 if reduced_features else 15000,  # Reduced for manifold methods
-                ngram_range=(1, 2) if reduced_features else (1, 3),
-                use_hyperparameter_tuning=not reduced_features
-            )
-            
-            result = classifier.train_from_files(
-                human_file=human_file,
-                ai_file=ai_file,
-                test_size=test_size,
-                validation_size=validation_size,
-                cv_folds=3 if reduced_cv else 5
-            )
-            
-            training_time = time.time() - start_time
-            result['method'] = f'{method_type.title()}: {method_name}'
-            result['training_time'] = training_time
-            
-            # Save model automatically
-            if save_model and model_save_path and classifier:
-                try:
-                    model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved manifold model to {model_path}")
-                except Exception as e:
-                    print(f"Failed to save manifold model: {e}")
-            
-            return result
-            
-        elif method_type == 'advanced':
-            classifier = AdvancedTextClassifier(
-                classifier_type=method_name,
-                max_features=10000 if reduced_features else 15000,
-                ngram_range=(1, 2) if reduced_features else (1, 3),
-                use_hyperparameter_tuning=not reduced_features
-            )
-            
-            result = classifier.train_from_files(
-                human_file=human_file,
-                ai_file=ai_file,
-                test_size=test_size,
-                validation_size=validation_size,
-                cv_folds=3 if reduced_cv else 5
-            )
-            
-            training_time = time.time() - start_time
-            result['method'] = f'{method_type.title()}: {method_name}'
-            result['training_time'] = training_time
-            
-            # Save model automatically
-            if save_model and model_save_path and classifier:
-                try:
-                    model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved advanced model to {model_path}")
-                except Exception as e:
-                    print(f"Failed to save advanced model: {e}")
-            
-            return result
-            
-        elif method_type == 'interpretable':
-            classifier = InterpretableTextClassifier(
-                classifier_type=method_name,
-                max_features=10000 if reduced_features else 15000,
-                ngram_range=(1, 2) if reduced_features else (1, 3),
-                use_hyperparameter_tuning=not reduced_features
-            )
-            
-            result = classifier.train_from_files(
-                human_file=human_file,
-                ai_file=ai_file,
-                test_size=test_size,
-                validation_size=validation_size,
-                cv_folds=3 if reduced_cv else 5
-            )
-            
-            training_time = time.time() - start_time
-            result['method'] = f'{method_type.title()}: {method_name}'
-            result['training_time'] = training_time
-            
-            # Save model automatically
-            if save_model and model_save_path and classifier:
-                try:
-                    model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved interpretable model to {model_path}")
-                except Exception as e:
-                    print(f"Failed to save interpretable model: {e}")
-            
-            return result
+        elif method_type in ['probabilistic', 'manifold', 'advanced', 'interpretable']:
+            # Use pre-extracted features if available
+            if X_train is not None and y_train is not None:
+                # Map method types to their classifier classes
+                classifier_classes = {
+                    'probabilistic': ProbabilisticTextClassifier,
+                    'manifold': ManifoldTextClassifier,
+                    'advanced': AdvancedTextClassifier,
+                    'interpretable': InterpretableTextClassifier
+                }
+                
+                return train_feature_based_method(
+                    classifier_classes[method_type], method_type, method_name,
+                    X_train, X_val, X_test, y_train, y_val, y_test,
+                    reduced_features, reduced_cv, feature_extractor,
+                    save_model, model_save_path, start_time
+                )
+            else:
+                # Fallback to file-based training
+                classifier_classes = {
+                    'probabilistic': ProbabilisticTextClassifier,
+                    'manifold': ManifoldTextClassifier,
+                    'advanced': AdvancedTextClassifier,
+                    'interpretable': InterpretableTextClassifier
+                }
+                
+                max_features_map = {
+                    'probabilistic': 10000 if reduced_features else 15000,
+                    'manifold': 8000 if reduced_features else 15000,  # Reduced for manifold methods
+                    'advanced': 10000 if reduced_features else 15000,
+                    'interpretable': 10000 if reduced_features else 15000
+                }
+                
+                classifier = classifier_classes[method_type](
+                    classifier_type=method_name,
+                    max_features=max_features_map[method_type],
+                    ngram_range=(1, 2) if reduced_features else (1, 3),
+                    use_hyperparameter_tuning=not reduced_features
+                )
+                
+                result = classifier.train_from_files(
+                    human_file=human_file,
+                    ai_file=ai_file,
+                    test_size=test_size,
+                    validation_size=validation_size,
+                    cv_folds=3 if reduced_cv else 5
+                )
+                
+                training_time = time.time() - start_time
+                result['method'] = f'{method_type.title()}: {method_name}'
+                result['training_time'] = training_time
+                
+                # Save model automatically
+                if save_model and model_save_path and classifier:
+                    try:
+                        model_path = f"{model_save_path}_{method_name}"
+                        classifier.save_model(model_path)
+                        print(f"Saved {method_type} model to {model_path}")
+                    except Exception as e:
+                        print(f"Failed to save {method_type} model: {e}")
+                
+                return result
             
     except Exception as e:
         training_time = time.time() - start_time
@@ -630,9 +1246,116 @@ def main():
     total_start_time = time.time()
     
     try:
-        # Train methods one by one to avoid memory issues
-        for i, (method_type, method_name) in enumerate(methods_to_test, 1):
-            print(f"Progress: {i}/{len(methods_to_test)} methods")
+        # Separate methods that can use shared features from those that need raw text
+        feature_based_methods = []
+        text_based_methods = []
+        
+        for method_type, method_name in methods_to_test:
+            if method_type in ['classical', 'ensemble', 'probabilistic', 'manifold', 'advanced', 'interpretable']:
+                feature_based_methods.append((method_type, method_name))
+            else:
+                # Neural, sequential, hybrid, deep_learning need raw text
+                text_based_methods.append((method_type, method_name))
+        
+        print(f"Feature-based methods: {len(feature_based_methods)}")
+        print(f"Text-based methods: {len(text_based_methods)}")
+        print("="*50)
+        
+        # Extract features once for all feature-based methods
+        shared_features = None
+        X_train_std = X_val_std = X_test_std = None
+        X_train_mm = X_val_mm = X_test_mm = None
+        y_train = y_val = y_test = None
+        texts = labels = None
+        
+        if feature_based_methods:
+            print("Extracting shared features for feature-based methods...")
+            feature_extractor = SharedFeatureExtractor(
+                max_features=10000 if reduced_features else 15000,
+                ngram_range=(1, 2) if reduced_features else (1, 3)
+            )
+            
+            # Load data once
+            texts, labels = feature_extractor.load_corpus_files(args.human_file, args.ai_file)
+            
+            # Extract features once
+            shared_features = feature_extractor.extract_features(texts, reduced_features)
+            print(f"Extracted {shared_features.shape[1]} shared features")
+            
+            # Split data once
+            X_temp, X_test, y_temp, y_test = train_test_split(
+                shared_features, labels, test_size=args.test_size, random_state=42, stratify=labels
+            )
+            
+            X_train, X_val, y_train, y_val = train_test_split(
+                X_temp, y_temp, test_size=args.validation_size, random_state=42, stratify=y_temp
+            )
+            
+            # Pre-scale features with both scalers
+            X_train_std = feature_extractor.get_scaled_features(X_train, 'standard')
+            X_val_std = feature_extractor.get_scaled_features(X_val, 'standard')
+            X_test_std = feature_extractor.get_scaled_features(X_test, 'standard')
+            
+            X_train_mm = feature_extractor.get_scaled_features(X_train, 'minmax')
+            X_val_mm = feature_extractor.get_scaled_features(X_val, 'minmax')
+            X_test_mm = feature_extractor.get_scaled_features(X_test, 'minmax')
+            
+            print(f"Training set: {len(X_train)} samples")
+            print(f"Validation set: {len(X_val)} samples")
+            print(f"Test set: {len(X_test)} samples")
+            print("="*50)
+        
+        # Train feature-based methods with shared features
+        for i, (method_type, method_name) in enumerate(feature_based_methods, 1):
+            print(f"Progress (Feature-based): {i}/{len(feature_based_methods)} methods")
+            
+            # Choose appropriate scaling for the method
+            if method_name in ['naive_bayes', 'gaussian_nb', 'bernoulli_nb', 'multinomial_nb', 'complement_nb', 'categorical_nb', 'gaussian_nb_classifier']:
+                X_train_scaled = X_train_mm
+                X_val_scaled = X_val_mm
+                X_test_scaled = X_test_mm
+            else:
+                X_train_scaled = X_train_std
+                X_val_scaled = X_val_std
+                X_test_scaled = X_test_std
+            
+            result = train_single_method(
+                method_type=method_type,
+                method_name=method_name,
+                X_train=X_train_scaled,
+                X_val=X_val_scaled,
+                X_test=X_test_scaled,
+                y_train=y_train,
+                y_val=y_val,
+                y_test=y_test,
+                texts=texts,
+                labels=labels,
+                human_file=args.human_file,
+                ai_file=args.ai_file,
+                test_size=args.test_size,
+                validation_size=args.validation_size,
+                reduced_features=reduced_features,
+                reduced_cv=reduced_cv,
+                save_model=save_models,
+                model_save_path=args.model_save_path,
+                feature_extractor=feature_extractor
+            )
+            
+            result_key = f"{method_type}_{method_name}"
+            all_results[result_key] = result
+            
+            # Print immediate results
+            if 'error' not in result or result.get('error') is None:
+                print(f"Completed {result['method']}: {result['test_accuracy']:.4f} accuracy")
+            else:
+                print(f"Failed {result['method']}: {result['error']}")
+            
+            # Force garbage collection between methods
+            gc.collect()
+        
+        # Train text-based methods individually (they need raw text)
+        for i, (method_type, method_name) in enumerate(text_based_methods, 1):
+            print(f"Progress (Text-based): {i}/{len(text_based_methods)} methods")
             
             result = train_single_method(
                 method_type=method_type,

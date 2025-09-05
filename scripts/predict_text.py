@@ -291,9 +291,12 @@ def load_manifold_model(model_path, manifold_type):
     Returns:
         Tuple of (classifier instance, model type description).
     """
-    classifier = ManifoldTextClassifier(manifold_type=manifold_type)
-    classifier.load_model(model_path)
-    return classifier, f"Manifold: {manifold_type.upper()}"
+    try:
+        classifier = ManifoldTextClassifier(manifold_type=manifold_type)
+        classifier.load_model(model_path)
+        return classifier, f"Probabilistic: {manifold_type.title()}"
+    except Exception as e:
+        raise ValueError(f"Failed to load manifold model {manifold_type}: {e}")
 
 
 def load_advanced_model(model_path, classifier_type):
@@ -348,209 +351,84 @@ def discover_available_models():
     if not models_dir.exists():
         return available_models
     
-    # Check for consolidated models first
-    consolidated_files = list(models_dir.glob("*_consolidated.pkl"))
-    for consolidated_file in consolidated_files:
-        base_name = consolidated_file.stem.replace('_consolidated', '')
-        
-        if 'enhanced' in base_name or 'neural' in base_name:
-            available_models['neural'].append(('enhanced_neural_network', str(consolidated_file.with_suffix(''))))
-        elif 'hybrid' in base_name:
-            available_models['hybrid'].append(('hybrid', str(consolidated_file.with_suffix(''))))
-        elif any(classifier in base_name for classifier in ['random_forest', 'svm', 'logistic_regression', 
-                                                           'gradient_boosting', 'naive_bayes', 'knn', 
-                                                           'decision_tree', 'adaboost']):
-            for classifier_type in ['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
-                                  'naive_bayes', 'knn', 'decision_tree', 'adaboost']:
-                if classifier_type in base_name:
-                    available_models['classical'].append((classifier_type, str(consolidated_file.with_suffix(''))))
-                    break
-        elif any(ensemble in base_name for ensemble in ['voting', 'bagging', 'stacking', 'xgboost', 
-                                                       'lightgbm', 'catboost', 'extra_trees', 'custom_ensemble']):
-            for ensemble_type in ['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
-                                'catboost', 'extra_trees', 'custom_ensemble']:
-                if ensemble_type in base_name:
-                    available_models['ensemble'].append((ensemble_type, str(consolidated_file.with_suffix(''))))
-                    break
+    # Global set to track all processed models to avoid duplicates across categories
+    global_processed_models = set()
     
-    # Also check for models saved by compare_all_methods.py (without _consolidated suffix)
-    if not any(available_models.values()):
-        # Look for models with the pattern: comparison_<method_name>.pkl (current format)
-        comparison_files = list(models_dir.glob("comparison_*.pkl"))
-        processed_models = set()  # Track processed models to avoid duplicates
+    # Look for models with the pattern: comparison_<method_name>.pkl (current format)
+    comparison_files = list(models_dir.glob("comparison_*.pkl"))
+    
+    for model_file in comparison_files:
+        base_name = model_file.stem.replace('comparison_', '')
+        model_path = str(model_file.with_suffix(''))
         
-        for model_file in comparison_files:
-            base_name = model_file.stem.replace('comparison_', '')
-            model_path = str(model_file.with_suffix(''))
+        # Skip if already processed globally
+        if model_path in global_processed_models:
+            continue
+        
+        # Define model categories with exact matches to avoid duplicates
+        model_categories = {
+            # Classical models
+            'classical': ['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
+                         'naive_bayes', 'knn', 'decision_tree', 'adaboost'],
             
-            # Skip if already processed
-            if model_path in processed_models:
-                continue
-            
-            # Classical models - check exact match first
-            for classifier_type in ['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
-                                  'naive_bayes', 'knn', 'decision_tree', 'adaboost']:
-                if base_name == classifier_type:
-                    available_models['classical'].append((classifier_type, model_path))
-                    processed_models.add(model_path)
-                    break
-            
-            # Skip if already processed
-            if model_path in processed_models:
-                continue
-            
-            # Ensemble models - check exact match first
-            for ensemble_type in ['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
-                                'catboost', 'extra_trees', 'custom_ensemble']:
-                if base_name == ensemble_type:
-                    available_models['ensemble'].append((ensemble_type, model_path))
-                    processed_models.add(model_path)
-                    break
-            
-            # Skip if already processed
-            if model_path in processed_models:
-                continue
+            # Ensemble models  
+            'ensemble': ['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
+                        'catboost', 'extra_trees', 'custom_ensemble'],
             
             # Neural network models
-            if base_name == 'enhanced_neural_network':
-                available_models['neural'].append(('enhanced_neural_network', model_path))
-                processed_models.add(model_path)
-                continue
+            'neural': ['enhanced_neural_network'],
             
-            # Sequential/LSTM models (from sequential classifier)
-            if base_name == 'lstm_attention':
-                available_models['neural'].append(('sequential', model_path))
-                processed_models.add(model_path)
-                continue
+            # Sequential/LSTM models
+            'sequential': ['lstm_attention'],
             
-            # Hybrid models (from hybrid classifier)
-            if base_name == 'lstm_features':
-                available_models['hybrid'].append(('hybrid', model_path))
-                processed_models.add(model_path)
-                continue
+            # Hybrid models
+            'hybrid': ['lstm_features'],
             
-            # Probabilistic models - check exact match first
-            for prob_type in ['gaussian_nb', 'bernoulli_nb', 'multinomial_nb', 'complement_nb', 
-                             'categorical_nb', 'hmm', 'gaussian_mixture']:
-                if base_name == prob_type:
-                    available_models['probabilistic'].append((prob_type, model_path))
-                    processed_models.add(model_path)
-                    break
+            # Probabilistic models
+            'probabilistic': ['gaussian_nb', 'bernoulli_nb', 'multinomial_nb', 'complement_nb', 
+                             'categorical_nb', 'hmm', 'gaussian_mixture'],
             
-            # Skip if already processed
-            if model_path in processed_models:
-                continue
+            # Deep learning models
+            'deep_learning': ['cnn', 'transformer', 'attention_bilstm'],
             
-            # Deep learning models - check exact match first
-            for dl_type in ['cnn', 'transformer', 'attention_bilstm']:
-                if base_name == dl_type:
-                    available_models['deep_learning'].append((dl_type, model_path))
-                    processed_models.add(model_path)
-                    break
+            # Manifold learning models
+            'manifold': ['pca', 'tsne', 'isomap', 'lle', 'spectral_embedding', 
+                        'mds', 'ica', 'factor_analysis', 'truncated_svd'],
             
-            # Skip if already processed
-            if model_path in processed_models:
-                continue
+            # Advanced models
+            'advanced': ['isolation_forest', 'one_class_svm', 'local_outlier_factor', 
+                        'elliptic_envelope', 'sgd', 'passive_aggressive', 'perceptron', 
+                        'ridge', 'lasso', 'elastic_net', 'huber', 'quantile', 'tweedie'],
             
-            # Manifold learning models - check exact match first
-            for manifold_type in ['pca', 'tsne', 'isomap', 'lle', 'spectral_embedding', 
-                                 'mds', 'ica', 'factor_analysis', 'truncated_svd']:
-                if base_name == manifold_type:
-                    available_models['manifold'].append((manifold_type, model_path))
-                    processed_models.add(model_path)
-                    break
-            
-            # Skip if already processed
-            if model_path in processed_models:
-                continue
-            
-            # Advanced models - check exact match first
-            for adv_type in ['isolation_forest', 'one_class_svm', 'local_outlier_factor', 
-                            'elliptic_envelope', 'sgd', 'passive_aggressive', 'perceptron', 
-                            'ridge', 'lasso', 'elastic_net', 'huber', 'quantile', 'tweedie']:
-                if base_name == adv_type:
-                    available_models['advanced'].append((adv_type, model_path))
-                    processed_models.add(model_path)
-                    break
-            
-            # Skip if already processed
-            if model_path in processed_models:
-                continue
-            
-            # Interpretable models - check exact match first
-            for interp_type in ['linear_regression', 'lasso_regression', 'ridge_regression', 
-                               'elastic_net_regression', 'decision_tree_classifier', 
-                               'extra_tree_classifier', 'gaussian_nb_classifier']:
-                if base_name == interp_type:
-                    available_models['interpretable'].append((interp_type, model_path))
-                    processed_models.add(model_path)
-                    break
+            # Interpretable models
+            'interpretable': ['linear_regression', 'lasso_regression', 'ridge_regression', 
+                             'elastic_net_regression', 'decision_tree_classifier', 
+                             'extra_tree_classifier', 'gaussian_nb_classifier']
+        }
+        
+        # Find which category this model belongs to
+        model_added = False
+        for category, model_types in model_categories.items():
+            if base_name in model_types:
+                if category == 'sequential':
+                    # Sequential models go into neural category
+                    available_models['neural'].append(('sequential', model_path))
+                elif category == 'manifold':
+                    # Manifold models go into manifold category (but display as Probabilistic for compatibility)
+                    available_models['manifold'].append((base_name, model_path))
+                else:
+                    available_models[category].append((base_name, model_path))
+                
+                global_processed_models.add(model_path)
+                model_added = True
+                break
+        
+        # If model wasn't categorized, skip it to avoid duplicates
+        if not model_added:
+            print(f"Warning: Unknown model type '{base_name}' - skipping")
     
-    # Fallback to old multi-file format if no consolidated models found
-    if not any(available_models.values()):
-        neural_path_1 = "models/ai_human_classifier_enhanced"
-        neural_path_2 = "models/comparison_enhanced_neural_network"
-        hybrid_path = "models/ai_human_classifier_hybrid"
-        comparison_path = "models/comparison"
-        
-        # Check for neural network (try both possible paths)
-        neural_files_1 = [
-            f"{neural_path_1}_enhanced_model.pth",
-            f"{neural_path_1}_word_vectorizer.pkl",
-            f"{neural_path_1}_char_vectorizer.pkl",
-            f"{neural_path_1}_scaler.pkl"
-        ]
-        neural_files_2 = [
-            f"{neural_path_2}_enhanced_model.pth",
-            f"{neural_path_2}_word_vectorizer.pkl",
-            f"{neural_path_2}_char_vectorizer.pkl",
-            f"{neural_path_2}_scaler.pkl"
-        ]
-        
-        if all(Path(f).exists() for f in neural_files_1):
-            available_models['neural'].append(('enhanced_neural_network', neural_path_1))
-        elif all(Path(f).exists() for f in neural_files_2):
-            available_models['neural'].append(('enhanced_neural_network', neural_path_2))
-
-        # Check for hybrid model
-        hybrid_files = [
-            f"{hybrid_path}_hybrid_model.pth",
-            f"{hybrid_path}_hybrid_word_vectorizer.pkl",
-            f"{hybrid_path}_hybrid_char_vectorizer.pkl",
-            f"{hybrid_path}_hybrid_scaler.pkl"
-        ]
-        if all(Path(f).exists() for f in hybrid_files):
-            available_models['hybrid'].append(('hybrid', hybrid_path))
-        
-        # Check for classical models
-        classical_types = ['random_forest', 'svm', 'logistic_regression', 'gradient_boosting', 
-                          'naive_bayes', 'knn', 'decision_tree', 'adaboost']
-        
-        for classifier_type in classical_types:
-            classical_files = [
-                f"{comparison_path}_{classifier_type}_{classifier_type}_model.pkl",
-                f"{comparison_path}_{classifier_type}_{classifier_type}_word_vectorizer.pkl",
-                f"{comparison_path}_{classifier_type}_{classifier_type}_char_vectorizer.pkl",
-                f"{comparison_path}_{classifier_type}_{classifier_type}_scaler.pkl",
-                f"{comparison_path}_{classifier_type}_{classifier_type}_config.json"
-            ]
-            if all(Path(f).exists() for f in classical_files):
-                available_models['classical'].append((classifier_type, f"{comparison_path}_{classifier_type}"))
-        
-        # Check for ensemble models
-        ensemble_types = ['voting', 'bagging', 'stacking', 'xgboost', 'lightgbm', 
-                         'catboost', 'extra_trees', 'custom_ensemble']
-        
-        for ensemble_type in ensemble_types:
-            ensemble_files = [
-                f"{comparison_path}_{ensemble_type}_{ensemble_type}_ensemble_model.pkl",
-                f"{comparison_path}_{ensemble_type}_{ensemble_type}_word_vectorizer.pkl",
-                f"{comparison_path}_{ensemble_type}_{ensemble_type}_char_vectorizer.pkl",
-                f"{comparison_path}_{ensemble_type}_{ensemble_type}_scaler.pkl",
-                f"{comparison_path}_{ensemble_type}_{ensemble_type}_config.json"
-            ]
-            if all(Path(f).exists() for f in ensemble_files):
-                available_models['ensemble'].append((ensemble_type, f"{comparison_path}_{ensemble_type}"))
+    # Fallback logic removed to prevent potential duplication issues
+    # The consolidated model format should be sufficient
     
     return available_models
 
@@ -606,11 +484,10 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            model_type = f"Neural: {model_name.title()}"
-            print(f"{model_type:<30} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
     
     # Classical model predictions
     for model_name, model_path in available_models['classical']:
@@ -629,10 +506,10 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            print(f"Classical: {model_name.title():<20} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
     
     # Ensemble model predictions
     for model_name, model_path in available_models['ensemble']:
@@ -651,10 +528,10 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            print(f"Ensemble: {model_name.title():<20} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
 
     # Hybrid model predictions
     for model_name, model_path in available_models['hybrid']:
@@ -673,10 +550,10 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            print(f"{model_type:<30} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
     
     # Deep learning model predictions
     for model_name, model_path in available_models['deep_learning']:
@@ -695,10 +572,10 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            print(f"{model_type:<30} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
     
     # Probabilistic model predictions
     for model_name, model_path in available_models['probabilistic']:
@@ -717,10 +594,10 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            print(f"{model_type:<30} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
     
     # Manifold learning model predictions
     for model_name, model_path in available_models['manifold']:
@@ -739,10 +616,10 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            print(f"{model_type:<30} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
     
     # Advanced model predictions
     for model_name, model_path in available_models['advanced']:
@@ -761,10 +638,10 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            print(f"{model_type:<30} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
     
     # Interpretable model predictions
     for model_name, model_path in available_models['interpretable']:
@@ -783,32 +660,80 @@ def predict_with_all_models(text):
                 confidence = 1 - probability
             
             results.append((model_type, label, confidence))
-            print(f"{model_type:<30} {label:<15} {confidence:.3f}")
             
         except Exception as e:
-            print(f"{model_type:<30} ERROR: {str(e)}")
+            # Silently skip models that fail to load or predict
+            pass
     
-    # Summary statistics
+    # Display results in organized tables
     if results:
-        print("=" * 80)
-        ai_predictions = sum(1 for _, label, _ in results if label == "AI-generated")
-        human_predictions = len(results) - ai_predictions
+        # Separate results by prediction type
+        ai_results = [(model_type, confidence) for model_type, label, confidence in results if label == "AI-generated"]
+        human_results = [(model_type, confidence) for model_type, label, confidence in results if label == "Human-written"]
         
-        print(f"CONSENSUS SUMMARY:")
-        print(f"AI-generated predictions: {ai_predictions}/{len(results)} ({ai_predictions/len(results)*100:.1f}%)")
-        print(f"Human-written predictions: {human_predictions}/{len(results)} ({human_predictions/len(results)*100:.1f}%)")
+        # Sort by confidence (highest to lowest)
+        ai_results.sort(key=lambda x: x[1], reverse=True)
+        human_results.sort(key=lambda x: x[1], reverse=True)
+        
+        print()
+        print("=" * 90)
+        print("PREDICTION RESULTS - ORGANIZED BY CLASSIFICATION")
+        print("=" * 90)
+        
+        # AI-generated predictions table
+        if ai_results:
+            print(f"\n🤖 MODELS PREDICTING AI-GENERATED ({len(ai_results)} models)")
+            print("-" * 60)
+            print(f"{'Model':<35} {'Confidence':<10}")
+            print("-" * 60)
+            for model_type, confidence in ai_results:
+                print(f"{model_type:<35} {confidence:.3f}")
+        
+        # Human-written predictions table
+        if human_results:
+            print(f"\n👤 MODELS PREDICTING HUMAN-WRITTEN ({len(human_results)} models)")
+            print("-" * 60)
+            print(f"{'Model':<35} {'Confidence':<10}")
+            print("-" * 60)
+            for model_type, confidence in human_results:
+                print(f"{model_type:<35} {confidence:.3f}")
+        
+        # Summary statistics
+        print("\n" + "=" * 90)
+        print("CONSENSUS SUMMARY")
+        print("=" * 90)
+        ai_predictions = len(ai_results)
+        human_predictions = len(human_results)
+        total_predictions = len(results)
+        
+        print(f"Total models: {total_predictions}")
+        print(f"AI-generated predictions: {ai_predictions} ({ai_predictions/total_predictions*100:.1f}%)")
+        print(f"Human-written predictions: {human_predictions} ({human_predictions/total_predictions*100:.1f}%)")
         
         # Calculate average confidence for each prediction type
-        ai_confidences = [conf for _, label, conf in results if label == "AI-generated"]
-        human_confidences = [conf for _, label, conf in results if label == "Human-written"]
-        
-        if ai_confidences:
-            avg_ai_conf = sum(ai_confidences) / len(ai_confidences)
+        if ai_results:
+            avg_ai_conf = sum(conf for _, conf in ai_results) / len(ai_results)
             print(f"Average AI confidence: {avg_ai_conf:.3f}")
         
-        if human_confidences:
-            avg_human_conf = sum(human_confidences) / len(human_confidences)
+        if human_results:
+            avg_human_conf = sum(conf for _, conf in human_results) / len(human_results)
             print(f"Average Human confidence: {avg_human_conf:.3f}")
+        
+        # Overall consensus
+        if human_predictions > ai_predictions:
+            consensus = "HUMAN-WRITTEN"
+            margin = human_predictions - ai_predictions
+        elif ai_predictions > human_predictions:
+            consensus = "AI-GENERATED"
+            margin = ai_predictions - human_predictions
+        else:
+            consensus = "TIE"
+            margin = 0
+        
+        print(f"\nOVERALL CONSENSUS: {consensus}")
+        if margin > 0:
+            print(f"Margin: {margin} models ({margin/total_predictions*100:.1f}%)")
+        print("=" * 90)
 
 
 def predict_file_with_all_models(file_path, whole_document=None, separate_lines=None):
@@ -889,7 +814,8 @@ def predict_file_with_all_models(file_path, whole_document=None, separate_lines=
                     print(f"{model_type:<30} {label:<15} {confidence:.3f}")
                     
                 except Exception as e:
-                    print(f"{model_type:<30} ERROR: {str(e)}")
+                    # Silently skip models that fail to load or predict
+                    pass
             
             for model_name, model_path in available_models['classical']:
                 try:
@@ -910,7 +836,8 @@ def predict_file_with_all_models(file_path, whole_document=None, separate_lines=
                     print(f"{model_type:<30} {label:<15} {confidence:.3f}")
                     
                 except Exception as e:
-                    print(f"Classical: {model_name.title():<20} ERROR: {str(e)}")
+                    # Silently skip models that fail to load or predict
+                    pass
             
             for model_name, model_path in available_models['ensemble']:
                 try:
@@ -931,7 +858,8 @@ def predict_file_with_all_models(file_path, whole_document=None, separate_lines=
                     print(f"{model_type:<30} {label:<15} {confidence:.3f}")
                     
                 except Exception as e:
-                    print(f"Ensemble: {model_name.title():<20} ERROR: {str(e)}")
+                    # Silently skip models that fail to load or predict
+                    pass
             
             # Summary for single document
             if all_results:

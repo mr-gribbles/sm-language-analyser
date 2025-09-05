@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_sc
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
-from sklearn.naive_bayes import GaussianNB, BernoulliNB, CategoricalNB
+from sklearn.naive_bayes import GaussianNB, BernoulliNB, CategoricalNB, MultinomialNB, ComplementNB
 from sklearn.mixture import GaussianMixture
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
 import matplotlib.pyplot as plt
@@ -389,10 +389,24 @@ class ProbabilisticTextClassifier:
                 'binarize': [0.0, 0.1, 0.5]
             }
             
-        elif self.classifier_type == 'categorical_nb':
-            classifier = CategoricalNB()
+        elif self.classifier_type == 'multinomial_nb':
+            classifier = MultinomialNB()
             param_grid = {
                 'alpha': [0.1, 0.5, 1.0, 2.0]
+            }
+            
+        elif self.classifier_type == 'complement_nb':
+            classifier = ComplementNB()
+            param_grid = {
+                'alpha': [0.1, 0.5, 1.0, 2.0]
+            }
+            
+        elif self.classifier_type == 'categorical_nb':
+            # CategoricalNB requires discrete features, so we'll use a wrapper
+            classifier = CategoricalNBWrapper()
+            param_grid = {
+                'alpha': [0.1, 0.5, 1.0, 2.0],
+                'n_bins': [5, 10, 20, 50]
             }
             
         elif self.classifier_type == 'gaussian_mixture':
@@ -689,6 +703,81 @@ class ProbabilisticTextClassifier:
         plt.show()
 
 
+class CategoricalNBWrapper:
+    """Wrapper for CategoricalNB that discretizes continuous features."""
+    
+    def __init__(self, alpha: float = 1.0, n_bins: int = 10):
+        self.alpha = alpha
+        self.n_bins = n_bins
+        self.model = None
+        self.bin_edges = None
+        
+    def _discretize_features(self, X):
+        """Discretize continuous features into categorical bins."""
+        if self.bin_edges is None:
+            # Fit bin edges during training
+            self.bin_edges = []
+            X_discretized = np.zeros_like(X, dtype=int)
+            
+            for feature_idx in range(X.shape[1]):
+                feature_values = X[:, feature_idx]
+                # Use quantile-based binning to ensure balanced bins
+                try:
+                    _, bin_edges = np.histogram(feature_values, bins=self.n_bins)
+                    self.bin_edges.append(bin_edges)
+                    # Discretize this feature
+                    X_discretized[:, feature_idx] = np.digitize(feature_values, bin_edges[1:-1])
+                except Exception:
+                    # Fallback for constant features
+                    self.bin_edges.append(np.array([feature_values.min(), feature_values.max()]))
+                    X_discretized[:, feature_idx] = 0
+            
+            return X_discretized
+        else:
+            # Transform using existing bin edges
+            X_discretized = np.zeros_like(X, dtype=int)
+            
+            for feature_idx in range(X.shape[1]):
+                feature_values = X[:, feature_idx]
+                bin_edges = self.bin_edges[feature_idx]
+                if len(bin_edges) > 2:
+                    X_discretized[:, feature_idx] = np.digitize(feature_values, bin_edges[1:-1])
+                else:
+                    X_discretized[:, feature_idx] = 0
+            
+            return X_discretized
+    
+    def fit(self, X, y):
+        """Fit the CategoricalNB model with discretized features."""
+        X_discretized = self._discretize_features(X)
+        self.model = CategoricalNB(alpha=self.alpha)
+        self.model.fit(X_discretized, y)
+        return self
+    
+    def predict(self, X):
+        """Predict class labels."""
+        X_discretized = self._discretize_features(X)
+        return self.model.predict(X_discretized)
+    
+    def predict_proba(self, X):
+        """Predict class probabilities."""
+        X_discretized = self._discretize_features(X)
+        return self.model.predict_proba(X_discretized)
+    
+    def get_params(self, deep=True):
+        """Get parameters for sklearn compatibility."""
+        return {
+            'alpha': self.alpha,
+            'n_bins': self.n_bins
+        }
+    
+    def set_params(self, **params):
+        """Set parameters for sklearn compatibility."""
+        for key, value in params.items():
+            setattr(self, key, value)
+        return self
+
+
 class GaussianMixtureClassifier:
     """Gaussian Mixture Model classifier wrapper for sklearn compatibility."""
     
@@ -722,11 +811,24 @@ class GaussianMixtureClassifier:
         probabilities = np.zeros((n_samples, len(self.classes_)))
         
         for i, cls in enumerate(self.classes_):
-            probabilities[:, i] = self.models[cls].score_samples(X)
+            log_probs = self.models[cls].score_samples(X)
+            # Handle potential numerical issues
+            log_probs = np.nan_to_num(log_probs, nan=-1e10, posinf=-1e10, neginf=-1e10)
+            probabilities[:, i] = log_probs
         
-        # Convert log-likelihoods to probabilities
+        # Convert log-likelihoods to probabilities with numerical stability
+        # Subtract max for numerical stability
+        max_log_probs = np.max(probabilities, axis=1, keepdims=True)
+        probabilities = probabilities - max_log_probs
         probabilities = np.exp(probabilities)
-        probabilities = probabilities / probabilities.sum(axis=1, keepdims=True)
+        
+        # Normalize probabilities
+        prob_sums = probabilities.sum(axis=1, keepdims=True)
+        prob_sums = np.where(prob_sums == 0, 1e-10, prob_sums)  # Avoid division by zero
+        probabilities = probabilities / prob_sums
+        
+        # Final cleanup for any remaining NaN/inf values
+        probabilities = np.nan_to_num(probabilities, nan=0.5, posinf=1.0, neginf=0.0)
         
         return probabilities
     

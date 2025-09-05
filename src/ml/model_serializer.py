@@ -112,11 +112,14 @@ class ModelSerializer:
         package.char_vectorizer = package_data.get('char_vectorizer')
         package.scaler = package_data.get('scaler')
         
+        # Handle PyTorch models properly
         if package.model_type in ['enhanced', 'hybrid', 'sequential', 'lstm']:
             if 'model_state_dict' in package_data:
                 package.model = package_data['model_state_dict']
+            elif 'model' in package_data:
+                package.model = package_data['model']
             else:
-                package.model = package_data.get('model')
+                package.model = None
         else:
             package.model = package_data.get('model')
         
