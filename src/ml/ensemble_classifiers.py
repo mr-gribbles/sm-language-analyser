@@ -47,24 +47,56 @@ def suppress_sklearn_warnings():
                               message='.*overflow encountered.*')
         warnings.filterwarnings('ignore', category=RuntimeWarning, 
                               message='.*invalid value encountered.*')
+        # LightGBM specific warnings
+        warnings.filterwarnings('ignore', category=UserWarning,
+                              message='.*feature_name keyword has been found.*')
+        warnings.filterwarnings('ignore', category=UserWarning,
+                              message='.*does not have valid feature names.*')
         yield
 
 
+# Lazy imports for heavy ML libraries to avoid startup delays
+def _get_xgboost():
+    """Lazy import for XGBoost."""
+    try:
+        from xgboost import XGBClassifier
+        return XGBClassifier, True
+    except ImportError:
+        return None, False
+
+def _get_lightgbm():
+    """Lazy import for LightGBM."""
+    try:
+        from lightgbm import LGBMClassifier
+        return LGBMClassifier, True
+    except ImportError:
+        return None, False
+
+def _get_catboost():
+    """Lazy import for CatBoost."""
+    try:
+        from catboost import CatBoostClassifier
+        return CatBoostClassifier, True
+    except ImportError:
+        return None, False
+
+# Check availability without importing (for backwards compatibility)
+XGBOOST_AVAILABLE = True
+LIGHTGBM_AVAILABLE = True
+CATBOOST_AVAILABLE = True
+
 try:
-    from xgboost import XGBClassifier
-    XGBOOST_AVAILABLE = True
+    import xgboost
 except ImportError:
     XGBOOST_AVAILABLE = False
 
 try:
-    from lightgbm import LGBMClassifier
-    LIGHTGBM_AVAILABLE = True
+    import lightgbm
 except ImportError:
     LIGHTGBM_AVAILABLE = False
 
 try:
-    from catboost import CatBoostClassifier
-    CATBOOST_AVAILABLE = True
+    import catboost
 except ImportError:
     CATBOOST_AVAILABLE = False
 
@@ -344,7 +376,8 @@ class EnsembleTextClassifier:
             }
             
         elif self.ensemble_type == 'xgboost':
-            if not XGBOOST_AVAILABLE:
+            XGBClassifier, available = _get_xgboost()
+            if not available:
                 raise ValueError("XGBoost not available. Install with: pip install xgboost")
             
             classifier = XGBClassifier(random_state=42, eval_metric='logloss')
@@ -357,9 +390,11 @@ class EnsembleTextClassifier:
             }
             
         elif self.ensemble_type == 'lightgbm':
-            if not LIGHTGBM_AVAILABLE:
+            LGBMClassifier, available = _get_lightgbm()
+            if not available:
                 raise ValueError("LightGBM not available. Install with: pip install lightgbm")
             
+            # Remove feature_name parameter to avoid warnings - sklearn interface doesn't properly support this
             classifier = LGBMClassifier(random_state=42, verbose=-1)
             param_grid = {
                 'n_estimators': [100, 200, 300],
@@ -371,7 +406,8 @@ class EnsembleTextClassifier:
             }
             
         elif self.ensemble_type == 'catboost':
-            if not CATBOOST_AVAILABLE:
+            CatBoostClassifier, available = _get_catboost()
+            if not available:
                 raise ValueError("CatBoost not available. Install with: pip install catboost")
             
             classifier = CatBoostClassifier(random_state=42, verbose=False)
@@ -390,10 +426,13 @@ class EnsembleTextClassifier:
             base_estimators.append(('gb', GradientBoostingClassifier(random_state=42)))
             base_estimators.append(('ada', AdaBoostClassifier(random_state=42)))
             
-            if XGBOOST_AVAILABLE:
+            # Use lazy imports for optional boosting methods
+            XGBClassifier, xgb_available = _get_xgboost()
+            if xgb_available:
                 base_estimators.append(('xgb', XGBClassifier(random_state=42, eval_metric='logloss')))
             
-            if LIGHTGBM_AVAILABLE:
+            LGBMClassifier, lgb_available = _get_lightgbm()
+            if lgb_available:
                 base_estimators.append(('lgb', LGBMClassifier(random_state=42, verbose=-1)))
             
             # Add tree-based methods

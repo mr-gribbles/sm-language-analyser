@@ -28,6 +28,85 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.feature_extraction.text import TfidfVectorizer
+import joblib
+import psutil
+import resource
+
+# Configure joblib for memory efficiency and resource cleanup
+joblib_memory_limit = '1G'  # Limit memory usage
+os.environ.setdefault('JOBLIB_TEMP_FOLDER', '/tmp')
+os.environ.setdefault('OMP_NUM_THREADS', '2')  # Slightly increased from 1 
+os.environ.setdefault('MKL_NUM_THREADS', '2')  # For Intel MKL
+os.environ.setdefault('NUMEXPR_NUM_THREADS', '2')  # For NumExpr
+os.environ.setdefault('OPENBLAS_NUM_THREADS', '2')  # For OpenBLAS
+
+# Set joblib parallel backend configuration
+with joblib.parallel_backend('threading', n_jobs=2):
+    # Configure joblib with memory-conscious settings
+    joblib.parallel.BACKENDS['threading'].nesting_level = 0
+
+# Set memory limit to prevent system crashes
+def set_memory_limit():
+    """Set memory limit for the process to prevent system crashes."""
+    try:
+        # Get current and available memory info
+        available_memory = psutil.virtual_memory().available
+        current_soft_limit, current_hard_limit = resource.getrlimit(resource.RLIMIT_AS)
+        
+        # Calculate desired limit (80% of available memory)
+        desired_limit = int(available_memory * 0.8)
+        
+        # Only try to set limit if:
+        # 1. Current limit is unlimited (very large number)
+        # 2. Current limit is higher than desired limit
+        if (current_soft_limit == resource.RLIM_INFINITY or 
+            current_soft_limit > desired_limit):
+            
+            # Try to set new limit, but respect existing hard limit
+            new_limit = min(desired_limit, current_hard_limit) if current_hard_limit != resource.RLIM_INFINITY else desired_limit
+            resource.setrlimit(resource.RLIMIT_AS, (new_limit, current_hard_limit))
+            print(f"Set memory limit to {new_limit / (1024**3):.1f} GB")
+        else:
+            print(f"Using existing memory limit: {current_soft_limit / (1024**3):.1f} GB")
+            
+    except (OSError, ValueError) as e:
+        # This is common on macOS and other systems with strict memory management
+        print(f"Memory limit setting skipped (system managed): {e}")
+        pass
+    except Exception as e:
+        print(f"Could not set memory limit: {e}")
+        pass
+
+# Apply memory limit
+set_memory_limit()
+
+def cleanup_resources():
+    """Aggressive cleanup of system resources."""
+    gc.collect()  # Collect garbage
+    
+    # Clear joblib cache if it exists
+    try:
+        from joblib import memory
+        memory.clear()
+    except:
+        pass
+    
+    # Force cleanup of temporary files
+    import tempfile
+    import shutil
+    temp_dir = tempfile.gettempdir()
+    
+    # Clean up joblib temp folders
+    try:
+        for item in os.listdir(temp_dir):
+            if 'joblib_memmapping_folder' in item:
+                folder_path = os.path.join(temp_dir, item)
+                try:
+                    shutil.rmtree(folder_path, ignore_errors=True)
+                except:
+                    pass
+    except:
+        pass
 
 # Add the src directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -477,10 +556,11 @@ def train_feature_based_method(classifier_class, method_type: str, method_name: 
         # Cross-validation score
         cv_scores = cross_val_score(classifier.model, X_train, y_train, cv=3 if reduced_cv else 5, scoring='accuracy')
     
-    # Calculate metrics
+    # Calculate metrics with zero_division handling
     class_report = classification_report(y_test, test_predictions, 
                                        target_names=['Human', 'AI'], 
-                                       labels=[0, 1], output_dict=True)
+                                       labels=[0, 1], output_dict=True,
+                                       zero_division=0)
     
     result = {
         f'{method_type}_type': method_name,
@@ -506,12 +586,32 @@ def train_feature_based_method(classifier_class, method_type: str, method_name: 
     result['method'] = f'{method_type.title()}: {method_name}'
     result['training_time'] = training_time
     
-    # Save model automatically
+    # Save model automatically with comprehensive metrics
     if save_model and model_save_path and classifier:
         try:
             model_path = f"{model_save_path}_{method_name}"
-            classifier.save_model(model_path)
-            print(f"Saved {method_type} model to {model_path}")
+            
+            # Create comprehensive metrics for saving
+            comprehensive_metrics = {
+                'test_accuracy': result['test_accuracy'],
+                'test_precision': result['test_precision'],
+                'test_recall': result['test_recall'],
+                'test_f1': result['test_f1'],
+                'test_auc': result.get('test_auc', 0.0),
+                'feature_count': result['feature_count'],
+                'training_time': training_time,
+                'cv_mean': result['cv_mean'],
+                'cv_std': result['cv_std'],
+                'confusion_matrix': result['confusion_matrix'].tolist() if hasattr(result['confusion_matrix'], 'tolist') else result['confusion_matrix'],
+                'method': f'{method_type.title()}: {method_name}',
+                'model_type': method_type,
+                'classifier_name': method_name,
+                'best_params': result.get('best_params', {})
+            }
+            
+            # Save model with metrics
+            classifier.save_model_with_metrics(model_path, comprehensive_metrics)
+            print(f"Saved {method_type} model with metrics to {model_path}")
         except Exception as e:
             print(f"Failed to save {method_type} model: {e}")
     
@@ -714,12 +814,32 @@ def train_single_method(method_type: str, method_name: str,
                 result['method'] = f'{method_type.title()}: {method_name}'
                 result['training_time'] = training_time
                 
-                # Save model automatically
+                # Save model automatically with comprehensive metrics
                 if save_model and model_save_path and classifier:
                     try:
                         model_path = f"{model_save_path}_{method_name}"
-                        classifier.save_model(model_path)
-                        print(f"Saved classical model to {model_path}")
+                        
+                        # Create comprehensive metrics for saving
+                        comprehensive_metrics = {
+                            'test_accuracy': result['test_accuracy'],
+                            'test_precision': result['test_precision'],
+                            'test_recall': result['test_recall'],
+                            'test_f1': result['test_f1'],
+                            'test_auc': result.get('test_auc', 0.0),
+                            'feature_count': result['feature_count'],
+                            'training_time': training_time,
+                            'cv_mean': result['cv_mean'],
+                            'cv_std': result['cv_std'],
+                            'confusion_matrix': result['confusion_matrix'].tolist() if hasattr(result['confusion_matrix'], 'tolist') else result['confusion_matrix'],
+                            'method': f'{method_type.title()}: {method_name}',
+                            'model_type': method_type,
+                            'classifier_name': method_name,
+                            'best_params': result.get('best_params', {})
+                        }
+                        
+                        # Save model with metrics
+                        classifier.save_model_with_metrics(model_path, comprehensive_metrics)
+                        print(f"Saved classical model with metrics to {model_path}")
                     except Exception as e:
                         print(f"Failed to save classical model: {e}")
                 
@@ -833,12 +953,32 @@ def train_single_method(method_type: str, method_name: str,
                 result['method'] = f'{method_type.title()}: {method_name}'
                 result['training_time'] = training_time
                 
-                # Save model automatically
+                # Save model automatically with comprehensive metrics
                 if save_model and model_save_path and classifier:
                     try:
                         model_path = f"{model_save_path}_{method_name}"
-                        classifier.save_model(model_path)
-                        print(f"Saved ensemble model to {model_path}")
+                        
+                        # Create comprehensive metrics for saving
+                        comprehensive_metrics = {
+                            'test_accuracy': result['test_accuracy'],
+                            'test_precision': result['test_precision'],
+                            'test_recall': result['test_recall'],
+                            'test_f1': result['test_f1'],
+                            'test_auc': result.get('test_auc', 0.0),
+                            'feature_count': result['feature_count'],
+                            'training_time': training_time,
+                            'cv_mean': result['cv_mean'],
+                            'cv_std': result['cv_std'],
+                            'confusion_matrix': result['confusion_matrix'].tolist() if hasattr(result['confusion_matrix'], 'tolist') else result['confusion_matrix'],
+                            'method': f'{method_type.title()}: {method_name}',
+                            'model_type': method_type,
+                            'classifier_name': method_name,
+                            'best_params': result.get('best_params', {})
+                        }
+                        
+                        # Save model with metrics
+                        classifier.save_model_with_metrics(model_path, comprehensive_metrics)
+                        print(f"Saved ensemble model with metrics to {model_path}")
                     except Exception as e:
                         print(f"Failed to save ensemble model: {e}")
                 
@@ -891,12 +1031,32 @@ def train_single_method(method_type: str, method_name: str,
             
             training_time = time.time() - start_time
             
-            # Save model automatically
+            # Save model automatically with comprehensive metrics
             if save_model and model_save_path and classifier:
                 try:
                     model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved sequential model to {model_path}")
+                    
+                    # Create comprehensive metrics for saving
+                    comprehensive_metrics = {
+                        'test_accuracy': result['test_accuracy'],
+                        'test_precision': result['test_precision'],
+                        'test_recall': result['test_recall'],
+                        'test_f1': result['test_f1'],
+                        'test_auc': 0.0,
+                        'feature_count': 0,
+                        'training_time': training_time,
+                        'cv_mean': 0.0,
+                        'cv_std': 0.0,
+                        'confusion_matrix': result['confusion_matrix'].tolist() if hasattr(result['confusion_matrix'], 'tolist') else result['confusion_matrix'],
+                        'method': f'{method_type.title()}: {method_name}',
+                        'model_type': method_type,
+                        'classifier_name': method_name,
+                        'best_params': {}
+                    }
+                    
+                    # Save model with metrics
+                    classifier.save_model_with_metrics(model_path, comprehensive_metrics)
+                    print(f"Saved sequential model with metrics to {model_path}")
                 except Exception as e:
                     print(f"Failed to save sequential model: {e}")
             
@@ -934,12 +1094,32 @@ def train_single_method(method_type: str, method_name: str,
             
             training_time = time.time() - start_time
             
-            # Save model automatically
+            # Save model automatically with comprehensive metrics
             if save_model and model_save_path and classifier:
                 try:
                     model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved hybrid model to {model_path}")
+                    
+                    # Create comprehensive metrics for saving
+                    comprehensive_metrics = {
+                        'test_accuracy': result['test_accuracy'],
+                        'test_precision': result['test_precision'],
+                        'test_recall': result['test_recall'],
+                        'test_f1': result['test_f1'],
+                        'test_auc': 0.0,
+                        'feature_count': 0,
+                        'training_time': training_time,
+                        'cv_mean': 0.0,
+                        'cv_std': 0.0,
+                        'confusion_matrix': result['confusion_matrix'].tolist() if hasattr(result['confusion_matrix'], 'tolist') else result['confusion_matrix'],
+                        'method': f'{method_type.title()}: {method_name}',
+                        'model_type': method_type,
+                        'classifier_name': method_name,
+                        'best_params': {}
+                    }
+                    
+                    # Save model with metrics
+                    classifier.save_model_with_metrics(model_path, comprehensive_metrics)
+                    print(f"Saved hybrid model with metrics to {model_path}")
                 except Exception as e:
                     print(f"Failed to save hybrid model: {e}")
             
@@ -977,12 +1157,32 @@ def train_single_method(method_type: str, method_name: str,
             
             training_time = time.time() - start_time
             
-            # Save model automatically
+            # Save model automatically with comprehensive metrics
             if save_model and model_save_path and classifier:
                 try:
                     model_path = f"{model_save_path}_{method_name}"
-                    classifier.save_model(model_path)
-                    print(f"Saved deep learning model to {model_path}")
+                    
+                    # Create comprehensive metrics for saving
+                    comprehensive_metrics = {
+                        'test_accuracy': result['test_accuracy'],
+                        'test_precision': result['test_precision'],
+                        'test_recall': result['test_recall'],
+                        'test_f1': result['test_f1'],
+                        'test_auc': 0.0,
+                        'feature_count': 0,
+                        'training_time': training_time,
+                        'cv_mean': 0.0,
+                        'cv_std': 0.0,
+                        'confusion_matrix': result['confusion_matrix'].tolist() if hasattr(result['confusion_matrix'], 'tolist') else result['confusion_matrix'],
+                        'method': f'{method_type.title()}: {method_name}',
+                        'model_type': method_type,
+                        'classifier_name': method_name,
+                        'best_params': {}
+                    }
+                    
+                    # Save model with metrics
+                    classifier.save_model_with_metrics(model_path, comprehensive_metrics)
+                    print(f"Saved deep learning model with metrics to {model_path}")
                 except Exception as e:
                     print(f"Failed to save deep learning model: {e}")
             
@@ -1054,12 +1254,32 @@ def train_single_method(method_type: str, method_name: str,
                 result['method'] = f'{method_type.title()}: {method_name}'
                 result['training_time'] = training_time
                 
-                # Save model automatically
+                # Save model automatically with comprehensive metrics
                 if save_model and model_save_path and classifier:
                     try:
                         model_path = f"{model_save_path}_{method_name}"
-                        classifier.save_model(model_path)
-                        print(f"Saved {method_type} model to {model_path}")
+                        
+                        # Create comprehensive metrics for saving
+                        comprehensive_metrics = {
+                            'test_accuracy': result['test_accuracy'],
+                            'test_precision': result['test_precision'],
+                            'test_recall': result['test_recall'],
+                            'test_f1': result['test_f1'],
+                            'test_auc': result.get('test_auc', 0.0),
+                            'feature_count': result['feature_count'],
+                            'training_time': training_time,
+                            'cv_mean': result.get('cv_mean', 0.0),
+                            'cv_std': result.get('cv_std', 0.0),
+                            'confusion_matrix': result['confusion_matrix'].tolist() if hasattr(result['confusion_matrix'], 'tolist') else result['confusion_matrix'],
+                            'method': f'{method_type.title()}: {method_name}',
+                            'model_type': method_type,
+                            'classifier_name': method_name,
+                            'best_params': result.get('best_params', {})
+                        }
+                        
+                        # Save model with metrics
+                        classifier.save_model_with_metrics(model_path, comprehensive_metrics)
+                        print(f"Saved {method_type} model with metrics to {model_path}")
                     except Exception as e:
                         print(f"Failed to save {method_type} model: {e}")
                 
@@ -1167,7 +1387,7 @@ def main():
                                'elliptic_envelope', 'sgd', 'passive_aggressive', 'perceptron', 
                                'ridge', 'lasso', 'elastic_net', 'huber', 'quantile', 'tweedie'],
                        default=['isolation_forest', 'one_class_svm', 'local_outlier_factor', 
-                               'elliptic_envelope', 'sgd', 'passive_aggressive', 'perceptron', 
+                                'sgd', 'passive_aggressive', 'perceptron', 
                                'ridge', 'lasso', 'elastic_net', 'huber', 'quantile', 'tweedie'],
                        help='Advanced methods to test (default: all methods)')
     
@@ -1188,6 +1408,8 @@ def main():
                        help='Do NOT save trained models to disk (saves storage space)')
     parser.add_argument('--model-save-path', type=str, default='models/comparison',
                        help='Base path for saving models (default: models/comparison)')
+    parser.add_argument('--skip-completed', action='store_true',
+                       help='Skip methods that have already been trained (checks for existing model files)')
     parser.add_argument('--verbose', action='store_true',
                        help='Print detailed information during training')
     
@@ -1201,6 +1423,20 @@ def main():
     if not os.path.exists(args.ai_file):
         print(f"Error: AI text file '{args.ai_file}' does not exist.")
         sys.exit(1)
+    
+    # Function to check if a model already exists
+    def model_exists(method_type: str, method_name: str, model_save_path: str) -> bool:
+        """Check if a trained model already exists for the given method."""
+        if method_type == 'neural':
+            # Neural networks save with different extensions
+            model_path = f"{model_save_path}_{method_name}"
+            return (os.path.exists(f"{model_path}.h5") or 
+                   os.path.exists(f"{model_path}.keras") or
+                   os.path.exists(f"{model_path}.pkl"))
+        else:
+            # Other methods save as .pkl files
+            model_path = f"{model_save_path}_{method_name}.pkl"
+            return os.path.exists(model_path)
     
     # Memory optimization settings
     reduced_features = not args.full_features
@@ -1256,6 +1492,43 @@ def main():
     if not args.skip_interpretable:
         for method in args.interpretable_methods:
             methods_to_test.append(('interpretable', method))
+    
+    # Filter out completed methods if --skip-completed is specified
+    if args.skip_completed:
+        print("Checking for existing models...")
+        original_count = len(methods_to_test)
+        filtered_methods = []
+        skipped_methods = []
+        
+        for method_type, method_name in methods_to_test:
+            if model_exists(method_type, method_name, args.model_save_path):
+                skipped_methods.append((method_type, method_name))
+                if args.verbose:
+                    print(f"Skipping {method_type}: {method_name} (model already exists)")
+            else:
+                filtered_methods.append((method_type, method_name))
+                if args.verbose:
+                    print(f"Will train {method_type}: {method_name} (no existing model)")
+        
+        methods_to_test = filtered_methods
+        
+        print(f"Model filtering results:")
+        print(f"  Original methods: {original_count}")
+        print(f"  Existing models: {len(skipped_methods)}")
+        print(f"  Methods to train: {len(methods_to_test)}")
+        
+        if skipped_methods and args.verbose:
+            print(f"Skipped methods with existing models:")
+            for method_type, method_name in skipped_methods:
+                print(f"  - {method_type}: {method_name}")
+        
+        if len(methods_to_test) == 0:
+            print("All methods have existing models. Nothing to train!")
+            print("Use --verbose to see which models were found.")
+            print("To retrain existing models, run without --skip-completed flag.")
+            return
+        
+        print(f"Proceeding with {len(methods_to_test)} methods that need training.")
     
     # Limit methods if specified
     if args.max_methods and len(methods_to_test) > args.max_methods:
@@ -1336,6 +1609,12 @@ def main():
         for i, (method_type, method_name) in enumerate(feature_based_methods, 1):
             print(f"Progress (Feature-based): {i}/{len(feature_based_methods)} methods")
             
+            # Monitor memory usage before training
+            memory_before = psutil.virtual_memory()
+            if memory_before.percent > 85:
+                print(f"Warning: Memory usage at {memory_before.percent:.1f}% before training {method_type}: {method_name}")
+                cleanup_resources()
+                
             # Choose appropriate scaling for the method
             if method_name in ['naive_bayes', 'gaussian_nb', 'bernoulli_nb', 'multinomial_nb', 'complement_nb', 'categorical_nb', 'gaussian_nb_classifier']:
                 X_train_scaled = X_train_mm
@@ -1346,27 +1625,42 @@ def main():
                 X_val_scaled = X_val_std
                 X_test_scaled = X_test_std
             
-            result = train_single_method(
-                method_type=method_type,
-                method_name=method_name,
-                X_train=X_train_scaled,
-                X_val=X_val_scaled,
-                X_test=X_test_scaled,
-                y_train=y_train,
-                y_val=y_val,
-                y_test=y_test,
-                texts=texts,
-                labels=labels,
-                human_file=args.human_file,
-                ai_file=args.ai_file,
-                test_size=args.test_size,
-                validation_size=args.validation_size,
-                reduced_features=reduced_features,
-                reduced_cv=reduced_cv,
-                save_model=save_models,
-                model_save_path=args.model_save_path,
-                feature_extractor=feature_extractor
-            )
+            try:
+                result = train_single_method(
+                    method_type=method_type,
+                    method_name=method_name,
+                    X_train=X_train_scaled,
+                    X_val=X_val_scaled,
+                    X_test=X_test_scaled,
+                    y_train=y_train,
+                    y_val=y_val,
+                    y_test=y_test,
+                    texts=texts,
+                    labels=labels,
+                    human_file=args.human_file,
+                    ai_file=args.ai_file,
+                    test_size=args.test_size,
+                    validation_size=args.validation_size,
+                    reduced_features=reduced_features,
+                    reduced_cv=reduced_cv,
+                    save_model=save_models,
+                    model_save_path=args.model_save_path,
+                    feature_extractor=feature_extractor
+                )
+            except MemoryError:
+                print(f"Memory error training {method_type}: {method_name} - skipping")
+                result = {
+                    'method': f'{method_type.title()}: {method_name}',
+                    'training_time': 0.0,
+                    'error': 'Memory error - insufficient memory'
+                }
+            except Exception as e:
+                print(f"Error training {method_type}: {method_name}: {e}")
+                result = {
+                    'method': f'{method_type.title()}: {method_name}',
+                    'training_time': 0.0,
+                    'error': str(e)
+                }
             
             result_key = f"{method_type}_{method_name}"
             all_results[result_key] = result
@@ -1377,25 +1671,50 @@ def main():
             else:
                 print(f"Failed {result['method']}: {result['error']}")
             
-            # Force garbage collection between methods
-            gc.collect()
+            # Aggressive cleanup between methods
+            cleanup_resources()
+            
+            # Monitor memory after training
+            memory_after = psutil.virtual_memory()
+            print(f"Memory usage: {memory_after.percent:.1f}%")
         
         # Train text-based methods individually (they need raw text)
         for i, (method_type, method_name) in enumerate(text_based_methods, 1):
             print(f"Progress (Text-based): {i}/{len(text_based_methods)} methods")
             
-            result = train_single_method(
-                method_type=method_type,
-                method_name=method_name,
-                human_file=args.human_file,
-                ai_file=args.ai_file,
-                test_size=args.test_size,
-                validation_size=args.validation_size,
-                reduced_features=reduced_features,
-                reduced_cv=reduced_cv,
-                save_model=save_models,
-                model_save_path=args.model_save_path
-            )
+            # Monitor memory usage before training
+            memory_before = psutil.virtual_memory()
+            if memory_before.percent > 85:
+                print(f"Warning: Memory usage at {memory_before.percent:.1f}% before training {method_type}: {method_name}")
+                cleanup_resources()
+            
+            try:
+                result = train_single_method(
+                    method_type=method_type,
+                    method_name=method_name,
+                    human_file=args.human_file,
+                    ai_file=args.ai_file,
+                    test_size=args.test_size,
+                    validation_size=args.validation_size,
+                    reduced_features=reduced_features,
+                    reduced_cv=reduced_cv,
+                    save_model=save_models,
+                    model_save_path=args.model_save_path
+                )
+            except MemoryError:
+                print(f"Memory error training {method_type}: {method_name} - skipping")
+                result = {
+                    'method': f'{method_type.title()}: {method_name}',
+                    'training_time': 0.0,
+                    'error': 'Memory error - insufficient memory'
+                }
+            except Exception as e:
+                print(f"Error training {method_type}: {method_name}: {e}")
+                result = {
+                    'method': f'{method_type.title()}: {method_name}',
+                    'training_time': 0.0,
+                    'error': str(e)
+                }
             
             result_key = f"{method_type}_{method_name}"
             all_results[result_key] = result
@@ -1406,8 +1725,12 @@ def main():
             else:
                 print(f"Failed {result['method']}: {result['error']}")
             
-            # Force garbage collection between methods
-            gc.collect()
+            # Aggressive cleanup between methods
+            cleanup_resources()
+            
+            # Monitor memory after training
+            memory_after = psutil.virtual_memory()
+            print(f"Memory usage: {memory_after.percent:.1f}%")
         
         total_time = time.time() - total_start_time
         

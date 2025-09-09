@@ -95,6 +95,20 @@ class AdvancedModelEvaluator:
             
             # Handle different model storage formats
             if isinstance(model_data, dict):
+                # Extract performance metrics if available
+                performance_metrics = {}
+                if 'performance_metrics' in model_data:
+                    perf_data = model_data['performance_metrics']
+                    if isinstance(perf_data, dict) and perf_data:
+                        performance_metrics = perf_data.copy()
+                        print(f"Found performance metrics in {model_path.name}: {list(performance_metrics.keys())}")
+                    elif isinstance(perf_data, dict) and len(perf_data) == 0:
+                        print(f"Found empty performance metrics dictionary in {model_path.name}")
+                    elif isinstance(perf_data, list) and len(perf_data) == 0:
+                        print(f"Found empty performance metrics list in {model_path.name}")
+                    else:
+                        print(f"Found performance metrics in {model_path.name} but in unexpected format: {type(perf_data)}")
+                
                 # Models are stored as dictionaries with metadata
                 if 'model' in model_data:
                     model = model_data['model']
@@ -129,7 +143,12 @@ class AdvancedModelEvaluator:
                         
                         model = ModelWrapper(model, model_data)
                     
-                    return model, model_type, {}
+                    return model, model_type, performance_metrics
+                elif 'model_state_dict' in model_data:
+                    # Handle PyTorch/deep learning models
+                    print(f"Found PyTorch model state in {model_path.name}")
+                    # For now, return None for PyTorch models as they need special loading
+                    return None, "PyTorch", performance_metrics
                 else:
                     # Dictionary doesn't contain a model - try to find the actual model
                     print(f"Warning: {model_path.name} dictionary doesn't contain 'model' key")
@@ -162,7 +181,7 @@ class AdvancedModelEvaluator:
         # Check more models to get better dimension detection
         for model_file in model_files[:15]:  # Check first 15 models instead of 5
             try:
-                model, _ = self.load_model_safely(model_file)
+                model, _, _ = self.load_model_safely(model_file)  # Fix: expects 3 return values
                 if model is None:
                     continue
                 
@@ -176,10 +195,14 @@ class AdvancedModelEvaluator:
                         feature_dims[dim] = feature_dims.get(dim, 0) + 1
                         print(f"Model {model_file.name} expects {dim} features")
                         break
-                    except Exception:
+                    except Exception as e:
+                        # Debug: print what dimension failed
+                        if "expecting" in str(e):
+                            print(f"Model {model_file.name} dimension error: {str(e)}")
                         continue
                         
             except Exception as e:
+                print(f"Error loading model {model_file.name} for dimension detection: {e}")
                 continue
         
         return feature_dims
@@ -187,27 +210,200 @@ class AdvancedModelEvaluator:
     def load_test_data(self):
         """Load test data for model evaluation with proper feature dimensions."""
         try:
-            # Try to load actual corpus data first
-            from src.ml.classical_classifiers import ClassicalTextClassifier
+            # Try to load actual corpus data first by checking a model's vectorizers
+            print("Attempting to load real test data using saved model vectorizers...")
             
-            # Check if we have corpus files
-            human_files = list(Path("corpora").glob("*human*.jsonl"))
-            ai_files = list(Path("corpora").glob("*ai*.jsonl"))
+            # Find a model file to get the vectorizers from
+            model_files = self.discover_all_models()
             
-            if human_files and ai_files:
-                print("Found corpus files, loading real test data...")
-                classifier = ClassicalTextClassifier()
-                texts, labels = classifier.load_corpus_files(str(human_files[0]), str(ai_files[0]))
-                
-                if texts:
-                    # Extract features using the same pipeline as training
-                    features = classifier.extract_features(texts[:1000])  # Use first 1000 samples
+            for model_file in model_files[:5]:  # Try first 5 models
+                try:
+                    with open(model_file, 'rb') as f:
+                        model_data = pickle.load(f)
                     
-                    self.X_test = features
-                    self.y_test = np.array(labels[:1000])
-                    
-                    print(f"Loaded real test data: {len(self.X_test)} samples with {self.X_test.shape[1]} features")
-                    return True
+                    if isinstance(model_data, dict) and 'word_vectorizer' in model_data:
+                        print(f"Found vectorizers in {model_file.name}, loading corpus data...")
+                        
+                        # Load corpus files - look for actual corpus files
+                        corpus_files = []
+                        
+                        # Check common corpus locations and patterns
+                        corpus_patterns = [
+                            "corpora/*.jsonl",
+                            "corpora/*/*.jsonl", 
+                            "corpora/original_only/*.jsonl",
+                            "corpora/rewritten_pairs/*.jsonl"
+                        ]
+                        
+                        for pattern in corpus_patterns:
+                            corpus_files.extend(Path(".").glob(pattern))
+                        
+                        if corpus_files:
+                            print(f"Found corpus files: {[f.name for f in corpus_files]}")
+                            
+                            # Load corpus data from available files
+                            human_texts = []
+                            ai_texts = []
+                            
+                            import json
+                            
+                            for corpus_file in corpus_files[:2]:  # Use first 2 files
+                                print(f"Loading data from {corpus_file}")
+                                try:
+                                    with open(corpus_file, 'r', encoding='utf-8') as f:
+                                        for line_num, line in enumerate(f):
+                                            if line_num >= 1000:  # Limit to first 1000 lines per file
+                                                break
+                                            try:
+                                                line = line.strip()
+                                                if not line:
+                                                    continue
+                                                    
+                                                data = json.loads(line)
+                                                
+                                                # Handle different corpus formats
+                                                if isinstance(data, dict):
+                                                    # Check for specific JSON structure used in this project
+                                                    text = None
+                                                    is_human = True
+                                                    
+                                                    # Check file name patterns to determine expected content type
+                                                    if 'rewritten' in corpus_file.name.lower() or 'pairs' in corpus_file.name.lower():
+                                                        # This should contain AI-rewritten texts
+                                                        if 'llm_transformation' in data and data['llm_transformation'] and 'rewritten_text' in data['llm_transformation']:
+                                                            text = data['llm_transformation']['rewritten_text']
+                                                            is_human = False
+                                                    else:
+                                                        # This should contain human/original texts
+                                                        if 'original_content' in data and data['original_content']:
+                                                            # Try cleaned_text first, then raw_text
+                                                            original_content = data['original_content']
+                                                            if 'cleaned_text' in original_content and original_content['cleaned_text']:
+                                                                text = original_content['cleaned_text']
+                                                            elif 'raw_text' in original_content and original_content['raw_text']:
+                                                                text = original_content['raw_text']
+                                                            is_human = True
+                                                    
+                                                    # Fallback: check for generic field names
+                                                    if not text:
+                                                        for field in ['text', 'content', 'original_text', 'human_text', 'ai_text']:
+                                                            if field in data and data[field]:
+                                                                text = data[field]
+                                                                break
+                                                        
+                                                        # Determine type by file name if we used fallback
+                                                        if 'ai' in corpus_file.name.lower() or 'rewritten' in corpus_file.name.lower():
+                                                            is_human = False
+                                                        else:
+                                                            is_human = True
+                                                    
+                                                    # Add text to appropriate list
+                                                    if text and text.strip():  # Only add non-empty texts
+                                                        if is_human:
+                                                            human_texts.append(text)
+                                                        else:
+                                                            ai_texts.append(text)
+                                                else:
+                                                    # Direct text content
+                                                    human_texts.append(str(data))  # Treat as human by default
+                                                    
+                                            except json.JSONDecodeError:
+                                                continue
+                                            except Exception as e:
+                                                continue
+                                                
+                                except Exception as e:
+                                    print(f"Error loading {corpus_file}: {e}")
+                                    continue
+                            
+                            # Combine and prepare data
+                            n_samples = min(500, len(human_texts), len(ai_texts))  # Use balanced sample
+                            texts = human_texts[:n_samples] + ai_texts[:n_samples]
+                            labels = [0] * n_samples + [1] * n_samples  # 0=human, 1=ai
+                            
+                            # Shuffle the data
+                            from sklearn.utils import shuffle
+                            texts, labels = shuffle(texts, labels, random_state=42)
+                            
+                            # Extract features using the saved vectorizers
+                            word_vectorizer = model_data['word_vectorizer']
+                            char_vectorizer = model_data['char_vectorizer']
+                            scaler = model_data['scaler']
+                            
+                            # Transform the text data with proper error handling
+                            try:
+                                if len(texts) == 0:
+                                    print("No texts loaded - falling back to synthetic data")
+                                    continue
+                                    
+                                print(f"Transforming {len(texts)} texts using saved vectorizers...")
+                                
+                                # Check if vectorizers have the right attributes
+                                if not hasattr(word_vectorizer, 'vocabulary_') or len(word_vectorizer.vocabulary_) == 0:
+                                    print("Word vectorizer vocabulary is empty - falling back to synthetic data")
+                                    continue
+                                    
+                                if not hasattr(char_vectorizer, 'vocabulary_') or len(char_vectorizer.vocabulary_) == 0:
+                                    print("Char vectorizer vocabulary is empty - falling back to synthetic data")
+                                    continue
+                                
+                                # Transform with error handling
+                                word_features = word_vectorizer.transform(texts).toarray()
+                                if word_features.shape[0] == 0 or word_features.shape[1] == 0:
+                                    print("Empty word features - falling back to synthetic data")
+                                    continue
+                                    
+                                char_features = char_vectorizer.transform(texts).toarray()
+                                if char_features.shape[0] == 0 or char_features.shape[1] == 0:
+                                    print("Empty char features - falling back to synthetic data")
+                                    continue
+                                
+                                # Combine features
+                                combined_features = np.hstack([word_features, char_features])
+                                
+                                # Check if we have any features
+                                if combined_features.shape[0] == 0 or combined_features.shape[1] == 0:
+                                    print("Empty combined features - falling back to synthetic data")
+                                    continue
+                                
+                                # Check feature dimension compatibility with scaler
+                                expected_features = None
+                                if hasattr(scaler, 'n_features_in_'):
+                                    expected_features = scaler.n_features_in_
+                                elif hasattr(scaler, 'scale_') and scaler.scale_ is not None:
+                                    expected_features = len(scaler.scale_)
+                                elif hasattr(scaler, 'data_max_') and scaler.data_max_ is not None:
+                                    expected_features = len(scaler.data_max_)
+                                
+                                if expected_features is not None and combined_features.shape[1] != expected_features:
+                                    print(f"Feature mismatch: got {combined_features.shape[1]} features, expected {expected_features}")
+                                    
+                                    # Try to fix feature mismatch by padding or truncating
+                                    if combined_features.shape[1] < expected_features:
+                                        # Pad with zeros
+                                        padding = np.zeros((combined_features.shape[0], expected_features - combined_features.shape[1]))
+                                        combined_features = np.hstack([combined_features, padding])
+                                        print(f"Padded features to {combined_features.shape[1]}")
+                                    elif combined_features.shape[1] > expected_features:
+                                        # Truncate
+                                        combined_features = combined_features[:, :expected_features]
+                                        print(f"Truncated features to {combined_features.shape[1]}")
+                                
+                                # Scale features
+                                self.X_test = scaler.transform(combined_features)
+                                self.y_test = np.array(labels)
+                                
+                            except Exception as transform_error:
+                                print(f"Error transforming features: {transform_error}")
+                                continue
+                            
+                            print(f"Loaded real test data: {len(self.X_test)} samples with {self.X_test.shape[1]} features")
+                            print(f"Feature distribution: {len(human_texts[:n_samples])} human, {len(ai_texts[:n_samples])} AI texts")
+                            return True
+                        
+                except Exception as e:
+                    print(f"Failed to load vectorizers from {model_file.name}: {e}")
+                    continue
             
         except Exception as e:
             print(f"Could not load real corpus data: {e}")
@@ -471,7 +667,7 @@ class AdvancedModelEvaluator:
         return composite_scores
     
     def evaluate_single_model(self, model, model_name: str, model_type: str) -> Dict[str, Any]:
-        """Evaluate a single model comprehensively."""
+        """Evaluate a single model comprehensively with timeout and error handling."""
         print(f"Evaluating {model_name}...")
         
         results = {
@@ -482,55 +678,99 @@ class AdvancedModelEvaluator:
         
         try:
             import time
-            start_time = time.time()
+            import signal
             
-            # Make predictions
-            if hasattr(model, 'predict'):
-                y_pred = model.predict(self.X_test)
-                prediction_time = time.time() - start_time
-                results['prediction_time'] = prediction_time
+            # Set up timeout for problematic models
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Model evaluation timed out")
+            
+            # Configure timeout (30 seconds per model)
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)
+            
+            try:
+                start_time = time.time()
                 
-                # Get probabilities if available
-                y_prob = None
-                if hasattr(model, 'predict_proba'):
-                    try:
-                        y_prob_full = model.predict_proba(self.X_test)
-                        if y_prob_full.shape[1] > 1:
-                            y_prob = y_prob_full[:, 1]  # Probability of positive class
-                    except:
-                        pass
-                elif hasattr(model, 'decision_function'):
-                    try:
-                        decision_scores = model.decision_function(self.X_test)
-                        # Convert decision scores to probabilities using sigmoid
-                        y_prob = 1 / (1 + np.exp(-decision_scores))
-                    except:
-                        pass
+                # Make predictions
+                if hasattr(model, 'predict'):
+                    # Check if this is a problematic model type that should be skipped
+                    if any(problematic in model_name.lower() for problematic in ['gaussian_mixture', 'isolation_forest', 'one_class_svm', 'local_outlier_factor']):
+                        print(f"Skipping evaluation of problematic model: {model_name}")
+                        results.update({
+                            'accuracy': 0.0, 'precision_weighted': 0.0, 'recall_weighted': 0.0,
+                            'f1_weighted': 0.0, 'auc_roc': 0.0, 'prediction_time': 0.0,
+                            'error': 'Skipped due to known issues'
+                        })
+                        return results
+                    
+                    # Limit test data size for complex models to prevent hangs
+                    test_size = min(100, len(self.X_test)) if 'mixture' in model_name.lower() else len(self.X_test)
+                    X_test_subset = self.X_test[:test_size]
+                    y_test_subset = self.y_test[:test_size]
+                    
+                    y_pred = model.predict(X_test_subset)
+                    prediction_time = time.time() - start_time
+                    results['prediction_time'] = prediction_time
+                    
+                    # Get probabilities if available
+                    y_prob = None
+                    if hasattr(model, 'predict_proba'):
+                        try:
+                            y_prob_full = model.predict_proba(X_test_subset)
+                            if y_prob_full.shape[1] > 1:
+                                y_prob = y_prob_full[:, 1]  # Probability of positive class
+                        except Exception as e:
+                            print(f"Warning: Could not get probabilities for {model_name}: {e}")
+                            pass
+                    elif hasattr(model, 'decision_function'):
+                        try:
+                            decision_scores = model.decision_function(X_test_subset)
+                            # Convert decision scores to probabilities using sigmoid
+                            y_prob = 1 / (1 + np.exp(-decision_scores))
+                        except Exception as e:
+                            print(f"Warning: Could not get decision scores for {model_name}: {e}")
+                            pass
+                    
+                    # Calculate comprehensive metrics
+                    metrics = self.calculate_advanced_metrics(y_test_subset, y_pred, y_prob)
+                    results.update(metrics)
+                    
+                    # Calculate model-specific stability metrics (skip for problematic models)
+                    if not any(problematic in model_name.lower() for problematic in ['mixture', 'isolation', 'outlier']):
+                        try:
+                            stability_metrics = self.calculate_model_stability_metrics(model, model_name)
+                            results.update(stability_metrics)
+                        except Exception as e:
+                            print(f"Warning: Could not calculate stability metrics for {model_name}: {e}")
+                    
+                    # Calculate complexity metrics
+                    complexity_metrics = self.calculate_model_complexity_metrics(model, model_name)
+                    results.update(complexity_metrics)
+                    
+                    # Calculate composite scores
+                    composite_scores = self.calculate_composite_scores(results)
+                    results.update(composite_scores)
+                    
+                else:
+                    print(f"Warning: Model {model_name} does not have predict method")
+                    # Set default values
+                    results.update({
+                        'accuracy': 0.0, 'precision_weighted': 0.0, 'recall_weighted': 0.0,
+                        'f1_weighted': 0.0, 'auc_roc': 0.0, 'prediction_time': 0.0,
+                        'error': 'No predict method'
+                    })
+                    
+            finally:
+                # Cancel the alarm
+                signal.alarm(0)
                 
-                # Calculate comprehensive metrics
-                metrics = self.calculate_advanced_metrics(self.y_test, y_pred, y_prob)
-                results.update(metrics)
-                
-                # Calculate model-specific stability metrics
-                stability_metrics = self.calculate_model_stability_metrics(model, model_name)
-                results.update(stability_metrics)
-                
-                # Calculate complexity metrics
-                complexity_metrics = self.calculate_model_complexity_metrics(model, model_name)
-                results.update(complexity_metrics)
-                
-                # Calculate composite scores
-                composite_scores = self.calculate_composite_scores(results)
-                results.update(composite_scores)
-                
-            else:
-                print(f"Warning: Model {model_name} does not have predict method")
-                # Set default values
-                results.update({
-                    'accuracy': 0.0, 'precision_weighted': 0.0, 'recall_weighted': 0.0,
-                    'f1_weighted': 0.0, 'auc_roc': 0.0, 'prediction_time': 0.0
-                })
-                
+        except TimeoutError:
+            print(f"Timeout: Model {model_name} evaluation timed out")
+            results.update({
+                'accuracy': 0.0, 'precision_weighted': 0.0, 'recall_weighted': 0.0,
+                'f1_weighted': 0.0, 'auc_roc': 0.0, 'prediction_time': 0.0,
+                'error': 'Evaluation timed out'
+            })
         except Exception as e:
             print(f"Error evaluating {model_name}: {e}")
             # Set default values for failed evaluation
@@ -1322,7 +1562,7 @@ class AdvancedModelEvaluator:
             f.write("TOP PERFORMERS ANALYSIS\n")
             f.write("-" * 30 + "\n")
             
-            top_accuracy = df.nlargest(3, 'accuracy')
+            top_accuracy = df.nlargest(3, 'accuracy') 
             f.write("Top 3 by Accuracy:\n")
             for i, (_, model) in enumerate(top_accuracy.iterrows(), 1):
                 f.write(f"  {i}. {model['method']}: {model['accuracy']:.4f}\n")

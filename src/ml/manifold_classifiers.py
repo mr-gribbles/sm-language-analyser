@@ -47,7 +47,7 @@ class ManifoldKNNClassifier:
         
         if self.manifold_type == 'tsne':
             return TSNE(n_components=min(safe_components, 3), random_state=42, 
-                       perplexity=min(15, safe_components-1), n_iter=300)
+                       perplexity=min(15, safe_components-1), max_iter=300)
         elif self.manifold_type == 'isomap':
             return Isomap(n_components=safe_components, n_neighbors=min(self.n_neighbors, 10))
         elif self.manifold_type == 'lle':

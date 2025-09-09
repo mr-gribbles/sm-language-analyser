@@ -100,11 +100,27 @@ class HiddenMarkovModelClassifier:
     def __init__(self, n_states: int = 3):
         self.n_states = n_states
         self.models = {}
+    
+    def get_params(self, deep=True):
+        """Get parameters for sklearn compatibility."""
+        return {'n_states': self.n_states}
+    
+    def set_params(self, **params):
+        """Set parameters for sklearn compatibility."""
+        for key, value in params.items():
+            setattr(self, key, value)
+        return self
         
     def _extract_sequences(self, texts: List[str]) -> List[List[int]]:
         """Extract character-level sequences from texts."""
         sequences = []
         for text in texts:
+            # Ensure text is a string, not numpy array
+            if isinstance(text, np.ndarray):
+                text = str(text[0]) if len(text) > 0 else ""
+            elif not isinstance(text, str):
+                text = str(text)
+            
             # Convert to character codes and normalize
             char_sequence = [min(ord(c), 127) for c in text.lower()[:100]]  # Limit length
             sequences.append(char_sequence)
@@ -559,14 +575,23 @@ class ProbabilisticTextClassifier:
     
     def _train_hmm(self, texts: List[str], labels: List[int], test_size: float, validation_size: float) -> Dict[str, Any]:
         """Train HMM classifier separately."""
+        # Convert to numpy arrays first to ensure proper indexing
+        texts_array = np.array(texts)
+        labels_array = np.array(labels)
+        
         # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            texts, labels, test_size=test_size, random_state=42, stratify=labels
+        X_train_idx, X_test_idx, y_train, y_test = train_test_split(
+            np.arange(len(texts)), labels_array, test_size=test_size, random_state=42, stratify=labels_array
         )
         
-        X_train, X_val, y_train, y_val = train_test_split(
-            X_train, y_train, test_size=validation_size, random_state=42, stratify=y_train
+        X_train_idx, X_val_idx, y_train, y_val = train_test_split(
+            X_train_idx, y_train, test_size=validation_size, random_state=42, stratify=y_train
         )
+        
+        # Get actual text data using indices
+        X_train = texts_array[X_train_idx].tolist()
+        X_val = texts_array[X_val_idx].tolist()
+        X_test = texts_array[X_test_idx].tolist()
         
         print(f"Training set: {len(X_train)} samples")
         print(f"Validation set: {len(X_val)} samples")

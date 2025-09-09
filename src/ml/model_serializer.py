@@ -2,7 +2,14 @@
 import pickle
 from pathlib import Path
 from typing import Dict, Any, Optional
-import torch
+
+# Optional torch import
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    TORCH_AVAILABLE = False
 
 
 class ModelPackage:
@@ -77,17 +84,30 @@ class ModelSerializer:
             'scaler': package.scaler
         }
         
-        # Handle PyTorch models by extracting state_dict
+        # Handle PyTorch models by extracting state_dict and saving proper metadata
         if package.model is not None:
             if hasattr(package.model, 'state_dict'):
-                # This is a PyTorch model, save its state_dict
+                # This is a PyTorch model, save its state_dict with reconstruction info
                 package_data['model_state_dict'] = package.model.state_dict()
-                package_data['model_config'] = package.config
+                package_data['model_architecture'] = package.model.__class__.__name__
+                package_data['is_pytorch_model'] = True
+                
+                # For Enhanced models, they use feature-based prediction, not sequence-based
+                if package.model_type == 'enhanced':
+                    package_data['pytorch_prediction_type'] = 'feature_based'
+                else:
+                    package_data['pytorch_prediction_type'] = 'sequence_based'
+                    
+                # Ensure config has the necessary reconstruction info
+                if hasattr(package.model, 'input_layer') and hasattr(package.model.input_layer, 'in_features'):
+                    package.config['input_dim'] = package.model.input_layer.in_features
             else:
                 # This is a regular model (sklearn, etc.)
                 package_data['model'] = package.model
+                package_data['is_pytorch_model'] = False
         else:
             package_data['model'] = None
+            package_data['is_pytorch_model'] = False
         
         save_path = f"{filepath}.pkl"
         with open(save_path, 'wb') as f:
@@ -96,7 +116,7 @@ class ModelSerializer:
         return save_path
     
     @staticmethod
-    def load_model_package(filepath: str, device: Optional[torch.device] = None) -> ModelPackage:
+    def load_model_package(filepath: str, device = None) -> ModelPackage:
         """Load a complete model package from a single file.
         
         Args:

@@ -25,6 +25,8 @@ from sklearn.neighbors import NearestCentroid
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
 from sklearn.cluster import KMeans
 from sklearn.semi_supervised import LabelPropagation, LabelSpreading
+from sklearn.covariance import EllipticEnvelope
+from sklearn.neighbors import LocalOutlierFactor
 from sklearn.base import clone
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -37,16 +39,24 @@ from .model_serializer import ModelPackage, ModelSerializer
 class HuberClassifier:
     """Huber regression adapted for classification."""
     
-    def __init__(self, epsilon=1.35, alpha=0.0001):
+    def __init__(self, epsilon=1.35, alpha=0.0001, max_iter=1000):
         self.epsilon = epsilon
         self.alpha = alpha
+        self.max_iter = max_iter
         self.regressor = None
         self.classes_ = None
         
     def fit(self, X, y):
         from sklearn.linear_model import HuberRegressor
         self.classes_ = np.unique(y)
-        self.regressor = HuberRegressor(epsilon=self.epsilon, alpha=self.alpha)
+        # Increase max_iter and set fit_intercept to improve convergence
+        self.regressor = HuberRegressor(
+            epsilon=self.epsilon, 
+            alpha=self.alpha,
+            max_iter=self.max_iter,
+            fit_intercept=True,
+            tol=1e-4
+        )
         self.regressor.fit(X, y)
         return self
         
@@ -61,7 +71,7 @@ class HuberClassifier:
         return proba
     
     def get_params(self, deep=True):
-        return {'epsilon': self.epsilon, 'alpha': self.alpha}
+        return {'epsilon': self.epsilon, 'alpha': self.alpha, 'max_iter': self.max_iter}
     
     def set_params(self, **params):
         for key, value in params.items():
@@ -347,11 +357,15 @@ class AdvancedTextClassifier:
             }
             
         elif self.classifier_type == 'elliptic_envelope':
-            from sklearn.covariance import EllipticEnvelope
-            classifier = EllipticEnvelope(random_state=42)
+            # EllipticEnvelope with optimized parameters to prevent hanging
+            classifier = EllipticEnvelope(
+                random_state=42,
+                assume_centered=False,
+                store_precision=False  # Reduce memory usage
+            )
             param_grid = {
-                'contamination': [0.05, 0.1, 0.15, 0.2],
-                'support_fraction': [None, 0.5, 0.7, 0.9]
+                'contamination': [0.1, 0.15],  # Reduced parameter space
+                'support_fraction': [None, 0.8]  # Only stable values
             }
             
         elif self.classifier_type == 'sgd':

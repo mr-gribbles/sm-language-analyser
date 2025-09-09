@@ -24,17 +24,26 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 import matplotlib.pyplot as plt
-import seaborn as sns
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 from .model_serializer import ModelPackage, ModelSerializer
 
-# Download VADER lexicon if not already present
-try:
-    import nltk
-    nltk.data.find('sentiment/vader_lexicon.zip')
-except nltk.downloader.DownloadError:
-    nltk.download('vader_lexicon')
+# NLTK imports moved to where they're needed to avoid hanging on startup
+def _get_sentiment_analyzer():
+    """Lazy import and initialization of NLTK sentiment analyzer."""
+    try:
+        from nltk.sentiment.vader import SentimentIntensityAnalyzer
+        import nltk
+        try:
+            nltk.data.find('sentiment/vader_lexicon.zip')
+        except nltk.downloader.DownloadError:
+            nltk.download('vader_lexicon')
+        return SentimentIntensityAnalyzer()
+    except ImportError:
+        # Return a dummy analyzer if NLTK is not available
+        class DummySentimentAnalyzer:
+            def polarity_scores(self, text):
+                return {'compound': 0.0, 'neg': 0.0, 'neu': 1.0, 'pos': 0.0}
+        return DummySentimentAnalyzer()
 
 
 class EnhancedTextClassifierNetwork(nn.Module):
@@ -133,7 +142,7 @@ class EnhancedAIHumanTextClassifier:
         self.scaler = None
         self.model = None
         self.feature_names = None
-        self.sentiment_analyzer = SentimentIntensityAnalyzer()
+        self.sentiment_analyzer = None  # Will be initialized lazily
         # Use MPS (Metal Performance Shaders) for M1/M2/M3/M4 Macs
         if torch.backends.mps.is_available():
             self.device = torch.device('mps')
@@ -196,7 +205,9 @@ class EnhancedAIHumanTextClassifier:
             unique_bigrams = set(bigrams)
             text_features.append(len(unique_bigrams) / len(bigrams) if len(bigrams) > 0 else 0)  # Bigram diversity
             
-            # Sentiment analysis features
+            # Sentiment analysis features (lazy loading)
+            if self.sentiment_analyzer is None:
+                self.sentiment_analyzer = _get_sentiment_analyzer()
             sentiment = self.sentiment_analyzer.polarity_scores(text)
             text_features.append(sentiment['compound'])
             text_features.append(sentiment['neg'])
@@ -657,9 +668,22 @@ class EnhancedAIHumanTextClassifier:
     
     def plot_confusion_matrix(self, confusion_matrix: np.ndarray, save_path: Optional[str] = None):
         """Plot confusion matrix."""
-        plt.figure(figsize=(8, 6))
-        sns.heatmap(confusion_matrix, annot=True, fmt='d', cmap='Blues',
-                   xticklabels=['Human', 'AI'], yticklabels=['Human', 'AI'])
+        try:
+            import seaborn as sns
+            plt.figure(figsize=(8, 6))
+            sns.heatmap(confusion_matrix, annot=True, fmt='d', cmap='Blues',
+                       xticklabels=['Human', 'AI'], yticklabels=['Human', 'AI'])
+        except ImportError:
+            # Fallback to matplotlib if seaborn is not available
+            plt.figure(figsize=(8, 6))
+            plt.imshow(confusion_matrix, interpolation='nearest', cmap='Blues')
+            plt.colorbar()
+            for i in range(confusion_matrix.shape[0]):
+                for j in range(confusion_matrix.shape[1]):
+                    plt.text(j, i, str(confusion_matrix[i, j]), ha='center', va='center')
+            plt.xticks([0, 1], ['Human', 'AI'])
+            plt.yticks([0, 1], ['Human', 'AI'])
+        
         plt.title('Enhanced Model Confusion Matrix')
         plt.xlabel('Predicted')
         plt.ylabel('Actual')

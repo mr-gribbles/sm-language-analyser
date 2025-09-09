@@ -531,7 +531,7 @@ class DeepLearningTextClassifier:
             raise ValueError("No model to save. Train the model first.")
         
         package = ModelPackage('deep_learning')
-        package.add_model(self.model)
+        package.add_model(self.model.state_dict())  # Save state_dict instead of full model
         
         # Add preprocessing components
         package.metadata.update({
@@ -559,7 +559,7 @@ class DeepLearningTextClassifier:
         
         # Create model package
         package = ModelPackage('deep_learning')
-        package.add_model(self.model)
+        package.add_model(self.model.state_dict())  # Save state_dict instead of full model
         
         # Add traditional feature components
         if self.tfidf_vectorizer is not None:
