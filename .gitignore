@@ -36,6 +36,7 @@ MANIFEST
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
+requirements.txt
 
 # Unit test / coverage reports
 htmlcov/
@@ -102,6 +103,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.DS_Store
 
 # Spyder project settings
 .spyderproject
@@ -135,3 +137,6 @@ corpora/
 
 # Analysis Results
 analysis_results/
+
+# Models
+models/

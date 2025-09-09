@@ -24,10 +24,14 @@ packages = {
     "# --- Machine Learning & NLP (for Evaluation & Analysis) ---": [
         "scikit-learn==1.5.1",    # For classical ML algorithms, metrics, and evaluation tools
         "torch==2.4.0",           # Core deep learning framework (PyTorch)
-        "transformers==4.42.4",   # Provides access to pre-trained models for evaluation (from Hugging Face)
         "textstat==0.7.8",        # For text statistics and analysis
         "nltk==3.9.1",            # Natural Language Toolkit for text processing
-        "conc==0.1.2"            # For advanced corpus analysis
+        "conc==0.1.2",            # For advanced corpus analysis
+        "xgboost==3.0.0",
+        "lightgbm==4.6.0",
+        "catboost==1.2.8",
+        "tqdm==4.65.0"
+
     ],
     "# --- Utilities ---": [
         "python-dotenv==1.1.1",   # For managing API keys and environment variables securely
