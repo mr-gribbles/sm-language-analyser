@@ -20,8 +20,8 @@ def initialize_bluesky_client():
     """Initialize and return an authenticated atproto Client for Bluesky.
 
     Returns:
-        An authenticated client instance if login is successful,
-        otherwise None.
+        Client: An authenticated client instance if login is successful,
+            otherwise None.
     """
 
     if not all([BLUESKY_USERNAME, BLUESKY_PASSWORD]):

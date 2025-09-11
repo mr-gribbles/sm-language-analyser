@@ -20,9 +20,9 @@ def clean_text(raw_text: str) -> str:
         raw_text: The raw text to be cleaned (must be a string).
 
     Returns:
-        A cleaned version of the text with HTML tags removed, URLs removed,
-        and whitespace normalized. Capitalization, punctuation, and emojis
-        are preserved.
+        str: A cleaned version of the text with HTML tags removed, URLs removed,
+            and whitespace normalized. Capitalization, punctuation, and emojis
+            are preserved.
 
     Raises:
         TypeError: If the input is not a string.

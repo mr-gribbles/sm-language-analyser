@@ -1,20 +1,21 @@
-"""
-Comprehensive AI vs Human Text Classification Prediction Script
+"""Comprehensive AI vs Human Text Classification Prediction Script.
 
-This script provides reliable predictions using models trained with the new training pipeline.
-Supports both individual model predictions and ensemble predictions.
+This script provides reliable predictions using models trained with the new
+training pipeline. Supports both individual model predictions and ensemble
+predictions.
 
 PEP 8 compliant and production-ready.
 """
 
-import os
-import sys
-import json
-import pickle
 import argparse
+import json
+import os
+import pickle
+import sys
 import warnings
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 import torch
@@ -32,7 +33,8 @@ warnings.filterwarnings('ignore')
 class FeatureExtractor:
     """Consistent feature extraction for all models."""
     
-    def __init__(self, max_features: int = 10000, ngram_range: Tuple[int, int] = (1, 2)):
+    def __init__(self, max_features: int = 10000, 
+                 ngram_range: Tuple[int, int] = (1, 2)):
         self.max_features = max_features
         self.ngram_range = ngram_range
         self.word_vectorizer = None
@@ -110,20 +112,24 @@ class FeatureExtractor:
             sentences = [s.strip() for s in text.split('.') if s.strip()]
             sentence_count = max(len(sentences), 1)
             text_features.append(sentence_count)
-            text_features.append(word_count / sentence_count)  # Avg words per sentence
+            # Avg words per sentence
+            text_features.append(word_count / sentence_count)
             
             # Character-level features
             if text_len > 0:
-                text_features.append(sum(1 for c in text if c.isupper()) / text_len)
-                text_features.append(sum(1 for c in text if c.islower()) / text_len)
-                text_features.append(sum(1 for c in text if c.isdigit()) / text_len)
-                text_features.append(sum(1 for c in text if c in '.,!?;:') / text_len)
+                upper_ratio = sum(1 for c in text if c.isupper()) / text_len
+                lower_ratio = sum(1 for c in text if c.islower()) / text_len
+                digit_ratio = sum(1 for c in text if c.isdigit()) / text_len
+                punct_ratio = sum(1 for c in text if c in '.,!?;:') / text_len
+                text_features.extend([upper_ratio, lower_ratio, digit_ratio, 
+                                    punct_ratio])
             else:
                 text_features.extend([0, 0, 0, 0])
             
             # Vocabulary complexity
             unique_words = set(words)
-            text_features.append(len(unique_words) / max(word_count, 1))  # Lexical diversity
+            # Lexical diversity
+            text_features.append(len(unique_words) / max(word_count, 1))
             
             # Average word length
             if words:
@@ -135,9 +141,13 @@ class FeatureExtractor:
             # Readability approximation
             avg_sentence_length = word_count / sentence_count
             if words:
-                syllable_counts = [max(1, len(re.findall(r'[aeiouAEIOU]', word))) for word in words]
+                syllable_counts = [
+                    max(1, len(re.findall(r'[aeiouAEIOU]', word))) 
+                    for word in words
+                ]
                 avg_syllables = np.mean(syllable_counts)
-                flesch_score = 206.835 - (1.015 * avg_sentence_length) - (84.6 * avg_syllables)
+                flesch_score = (206.835 - (1.015 * avg_sentence_length) - 
+                               (84.6 * avg_syllables))
                 text_features.append(np.clip(flesch_score, -100, 200))
             else:
                 text_features.append(0)
@@ -441,10 +451,10 @@ class ModelPredictor:
                 
                 # Display results
                 label = "AI-Generated" if prediction == 1 else "Human-Written"
-                print(f"\n🎯 ENSEMBLE PREDICTION: {label}")
-                print(f"📊 Confidence: {confidence:.3f}")
-                print(f"📈 Vote Distribution: {details['ai_predictions']} AI, {details['human_predictions']} Human")
-                print(f"📍 Margin: {details['margin']} models ({details['margin_percentage']:.1f}%)")
+                print(f"\nENSEMBLE PREDICTION: {label}")
+                print(f"Confidence: {confidence:.3f}")
+                print(f"Vote Distribution: {details['ai_predictions']} AI, {details['human_predictions']} Human")
+                print(f"Margin: {details['margin']} models ({details['margin_percentage']:.1f}%)")
                 
                 # Show all model predictions sorted by confidence
                 individual = details['individual_results']
@@ -461,12 +471,12 @@ class ModelPredictor:
                 human_models.sort(key=lambda x: 1-x[1], reverse=True)
                 
                 if ai_models:
-                    print(f"\n🤖 AI-GENERATED predictions ({len(ai_models)} models):")
+                    print(f"\nAI-GENERATED predictions ({len(ai_models)} models):")
                     for name, prob in ai_models:
                         print(f"   {name:<25} {prob:.3f}")
                 
                 if human_models:
-                    print(f"\n👤 HUMAN-WRITTEN predictions ({len(human_models)} models):")
+                    print(f"\nHUMAN-WRITTEN predictions ({len(human_models)} models):")
                     for name, prob in human_models:
                         confidence = 1 - prob  # Convert AI probability to Human confidence
                         print(f"   {name:<25} {confidence:.3f}")
@@ -574,12 +584,12 @@ def main():
                     human_models.sort(key=lambda x: 1-x[1], reverse=True)
                     
                     if ai_models:
-                        print(f"\n🤖 AI-GENERATED predictions ({len(ai_models)} models):")
+                        print(f"\nAI-GENERATED predictions ({len(ai_models)} models):")
                         for name, prob in ai_models:
                             print(f"   {name:<25} {prob:.3f}")
                     
                     if human_models:
-                        print(f"\n👤 HUMAN-WRITTEN predictions ({len(human_models)} models):")
+                        print(f"\nHUMAN-WRITTEN predictions ({len(human_models)} models):")
                         for name, prob in human_models:
                             confidence = 1 - prob  # Convert AI probability to Human confidence
                             print(f"   {name:<25} {confidence:.3f}")

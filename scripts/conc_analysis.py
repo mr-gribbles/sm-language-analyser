@@ -36,8 +36,8 @@ def ensure_spacy_model_installed(model="en_core_web_sm"):
 # Ensure the required spaCy model is installed before proceeding
 ensure_spacy_model_installed()
 
-save_path = f'corpora/'
-stop_words = get_stop_words(save_path = save_path)
+save_path = 'corpora/'
+stop_words = get_stop_words(save_path=save_path)
 
 def load_corpus_texts(filepath: str) -> list:
     """Load the cleaned text from a .jsonl corpus file into a list.
@@ -53,11 +53,13 @@ def load_corpus_texts(filepath: str) -> list:
         with open(filepath, 'r', encoding='utf-8') as f:
             for line in f:
                 record = json.loads(line)
-                text = record.get("original_content", {}).get("cleaned_selftext") or \
-                       record.get("original_content", {}).get("cleaned_text", "")
+                original_content = record.get("original_content", {})
+                text = (original_content.get("cleaned_selftext") or
+                        original_content.get("cleaned_text", ""))
                 
                 if record.get("llm_transformation"):
-                    text = record.get("llm_transformation", {}).get("rewritten_text", "")
+                    llm_transform = record.get("llm_transformation", {})
+                    text = llm_transform.get("rewritten_text", "")
                 
                 if text:
                     texts.append(text)
@@ -84,12 +86,14 @@ def build_corpus_from_texts(name: str, texts: list) -> Corpus:
     
     print(f"Writing texts for '{name}' corpus to temporary files...")
     for i, text in enumerate(texts):
-        with open(os.path.join(temp_dir, f"doc_{i}.txt"), 'w', encoding='utf-8') as f:
+        filename = os.path.join(temp_dir, f"doc_{i}.txt")
+        with open(filename, 'w', encoding='utf-8') as f:
             f.write(text)
             
     # Create a new Corpus object and build it from the files
     corpus = Corpus(name)
-    # The build method needs a path to save the final corpus. We'll make another temp dir for that.
+    # The build method needs a path to save the final corpus.
+    # We'll make another temp dir for that.
     save_path = tempfile.mkdtemp()
     corpus.build_from_files(source_path=temp_dir, save_path=save_path)
     
@@ -128,16 +132,33 @@ def main(original_corpus_path: str, rewritten_corpus_path: str):
     conc_rewritten = Conc(rewritten_corpus)
     
     print("\nGenerating frequency analysis...")
-    original_freq_result = conc_original.frequencies(exclude_punctuation=True, page_current=1, normalize_by=1000, exclude_tokens=stop_words)
+    original_freq_result = conc_original.frequencies(
+        exclude_punctuation=True,
+        page_current=1,
+        normalize_by=1000,
+        exclude_tokens=stop_words
+    )
     original_freq_df = original_freq_result.to_frame().to_pandas()
 
-    rewritten_freq_result = conc_rewritten.frequencies(exclude_punctuation=True, page_current=1, normalize_by=1000, exclude_tokens=stop_words)
+    rewritten_freq_result = conc_rewritten.frequencies(
+        exclude_punctuation=True,
+        page_current=1,
+        normalize_by=1000,
+        exclude_tokens=stop_words
+    )
     rewritten_freq_df = rewritten_freq_result.to_frame().to_pandas()
 
     # 3. Perform Keyness Analysis
     print("Performing keyness analysis...")
     keyness = Keyness(rewritten_corpus, original_corpus)
-    keyness_result = keyness.keywords(show_document_frequency=True, statistical_significance_cut=0.0001, apply_bonferroni=True, order_descending=True, min_frequency_reference=1, page_current=1)
+    keyness_result = keyness.keywords(
+        show_document_frequency=True,
+        statistical_significance_cut=0.0001,
+        apply_bonferroni=True,
+        order_descending=True,
+        min_frequency_reference=1,
+        page_current=1
+    )
     keyness_df = keyness_result.to_frame().to_pandas()
 
     # 4. Generate HTML report
@@ -173,7 +194,8 @@ def main(original_corpus_path: str, rewritten_corpus_path: str):
         </div>
         
         <div class="section">
-            <h2>Keyness Analysis - Top Keywords for Rewritten Corpus (vs. Original)</h2>
+            <h2>Keyness Analysis - Top Keywords for Rewritten Corpus 
+            (vs. Original)</h2>
             {keyness_df.to_html(index=False, classes='table')}
         </div>
     </body>
@@ -185,17 +207,24 @@ def main(original_corpus_path: str, rewritten_corpus_path: str):
     os.makedirs(output_dir, exist_ok=True)
     
     # Create filename based on input files
-    original_name = os.path.basename(original_corpus_path).replace('.jsonl', '')
-    rewritten_name = os.path.basename(rewritten_corpus_path).replace('.jsonl', '')
-    html_filename = f"{original_name}_vs_{rewritten_name}_concordance_report.html"
+    original_name = os.path.basename(original_corpus_path).replace(
+        '.jsonl', ''
+    )
+    rewritten_name = os.path.basename(rewritten_corpus_path).replace(
+        '.jsonl', ''
+    )
+    html_filename = (f"{original_name}_vs_{rewritten_name}"
+                     f"_concordance_report.html")
     html_path = os.path.join(output_dir, html_filename)
     
     with open(html_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
     
     print(f"✅ HTML report saved to: {html_path}")
-    print(f"📊 Report contains {len(original_freq_df)} original corpus frequencies")
-    print(f"📊 Report contains {len(rewritten_freq_df)} rewritten corpus frequencies") 
+    print(f"📊 Report contains {len(original_freq_df)} original corpus "
+          f"frequencies")
+    print(f"📊 Report contains {len(rewritten_freq_df)} rewritten corpus "
+          f"frequencies")
     print(f"📊 Report contains {len(keyness_df)} keyness analysis results")
     print("🎉 Concordance analysis completed successfully!")
     print(f"💡 To view the report, download the file: {html_filename}")
@@ -209,9 +238,20 @@ def run_conc_analysis(original_corpus_path: str, rewritten_corpus_path: str):
     main(original_corpus_path, rewritten_corpus_path)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Perform advanced analysis on two corpora using the 'conc' package.")
-    parser.add_argument("original_corpus", type=str, help="Path to the original (unedited) .jsonl corpus file.")
-    parser.add_argument("rewritten_corpus", type=str, help="Path to the rewritten .jsonl corpus file.")
+    parser = argparse.ArgumentParser(
+        description="Perform advanced analysis on two corpora using the "
+                   "'conc' package."
+    )
+    parser.add_argument(
+        "original_corpus", 
+        type=str, 
+        help="Path to the original (unedited) .jsonl corpus file."
+    )
+    parser.add_argument(
+        "rewritten_corpus", 
+        type=str, 
+        help="Path to the rewritten .jsonl corpus file."
+    )
     
     args = parser.parse_args()
     

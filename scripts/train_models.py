@@ -1,60 +1,62 @@
-"""
-Ultra-Comprehensive AI vs Human Text Classification Training Pipeline
+"""Ultra-Comprehensive AI vs Human Text Classification Training Pipeline.
 
-This script trains 50+ machine learning models suitable for binary text classification,
-with consistent feature extraction, proper model saving, and comprehensive performance evaluation.
+This script trains 50+ machine learning models suitable for binary text
+classification, with consistent feature extraction, proper model saving, and
+comprehensive performance evaluation.
 
 PEP 8 compliant and production-ready.
 """
 
-import os
-import sys
-import json
-import pickle
 import argparse
+import json
+import os
+import pickle
+import sys
 import warnings
-from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
-from sklearn.metrics import (
-    classification_report, confusion_matrix, accuracy_score,
-    precision_recall_fscore_support, roc_auc_score, roc_curve
-)
-
-# Classical ML models
-from sklearn.ensemble import (
-    RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier,
-    ExtraTreesClassifier, BaggingClassifier, VotingClassifier, StackingClassifier,
-    HistGradientBoostingClassifier
-)
-from sklearn.svm import SVC, LinearSVC, NuSVC
-from sklearn.linear_model import (
-    LogisticRegression, RidgeClassifier, SGDClassifier, Perceptron,
-    PassiveAggressiveClassifier, ElasticNet, Lasso, Ridge
-)
-from sklearn.tree import DecisionTreeClassifier, ExtraTreeClassifier
-from sklearn.neighbors import (
-    KNeighborsClassifier, RadiusNeighborsClassifier, NearestCentroid
-)
-from sklearn.naive_bayes import (
-    MultinomialNB, GaussianNB, BernoulliNB, ComplementNB, CategoricalNB
-)
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.neural_network import MLPClassifier
-
-# Deep learning
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.discriminant_analysis import (
+    LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
+)
+from sklearn.ensemble import (
+    AdaBoostClassifier, BaggingClassifier, ExtraTreesClassifier,
+    GradientBoostingClassifier, HistGradientBoostingClassifier,
+    RandomForestClassifier, StackingClassifier, VotingClassifier
+)
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import (
+    ElasticNet, Lasso, LogisticRegression, PassiveAggressiveClassifier,
+    Perceptron, Ridge, RidgeClassifier, SGDClassifier
+)
+from sklearn.metrics import (
+    accuracy_score, classification_report, confusion_matrix,
+    precision_recall_fscore_support, roc_auc_score, roc_curve
+)
+from sklearn.model_selection import (
+    StratifiedKFold, cross_val_score, train_test_split
+)
+from sklearn.naive_bayes import (
+    BernoulliNB, CategoricalNB, ComplementNB, GaussianNB, MultinomialNB
+)
+from sklearn.neighbors import (
+    KNeighborsClassifier, NearestCentroid, RadiusNeighborsClassifier
+)
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import LinearSVC, NuSVC, SVC
+from sklearn.tree import DecisionTreeClassifier, ExtraTreeClassifier
 from torch.utils.data import DataLoader, TensorDataset
+
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -67,7 +69,8 @@ plt.style.use('seaborn-v0_8')
 class FeatureExtractor:
     """Consistent feature extraction for all models."""
     
-    def __init__(self, max_features: int = 10000, ngram_range: Tuple[int, int] = (1, 2)):
+    def __init__(self, max_features: int = 10000, 
+                 ngram_range: Tuple[int, int] = (1, 2)):
         self.max_features = max_features
         self.ngram_range = ngram_range
         self.word_vectorizer = None
@@ -145,20 +148,24 @@ class FeatureExtractor:
             sentences = [s.strip() for s in text.split('.') if s.strip()]
             sentence_count = max(len(sentences), 1)
             text_features.append(sentence_count)
-            text_features.append(word_count / sentence_count)  # Avg words per sentence
+            # Avg words per sentence
+            text_features.append(word_count / sentence_count)
             
             # Character-level features
             if text_len > 0:
-                text_features.append(sum(1 for c in text if c.isupper()) / text_len)
-                text_features.append(sum(1 for c in text if c.islower()) / text_len)
-                text_features.append(sum(1 for c in text if c.isdigit()) / text_len)
-                text_features.append(sum(1 for c in text if c in '.,!?;:') / text_len)
+                upper_ratio = sum(1 for c in text if c.isupper()) / text_len
+                lower_ratio = sum(1 for c in text if c.islower()) / text_len
+                digit_ratio = sum(1 for c in text if c.isdigit()) / text_len
+                punct_ratio = sum(1 for c in text if c in '.,!?;:') / text_len
+                text_features.extend([upper_ratio, lower_ratio, digit_ratio,
+                                    punct_ratio])
             else:
                 text_features.extend([0, 0, 0, 0])
             
             # Vocabulary complexity
             unique_words = set(words)
-            text_features.append(len(unique_words) / max(word_count, 1))  # Lexical diversity
+            # Lexical diversity
+            text_features.append(len(unique_words) / max(word_count, 1))
             
             # Average word length
             if words:
@@ -170,9 +177,13 @@ class FeatureExtractor:
             # Readability approximation
             avg_sentence_length = word_count / sentence_count
             if words:
-                syllable_counts = [max(1, len(re.findall(r'[aeiouAEIOU]', word))) for word in words]
+                syllable_counts = [
+                    max(1, len(re.findall(r'[aeiouAEIOU]', word))) 
+                    for word in words
+                ]
                 avg_syllables = np.mean(syllable_counts)
-                flesch_score = 206.835 - (1.015 * avg_sentence_length) - (84.6 * avg_syllables)
+                flesch_score = (206.835 - (1.015 * avg_sentence_length) - 
+                               (84.6 * avg_syllables))
                 text_features.append(np.clip(flesch_score, -100, 200))
             else:
                 text_features.append(0)

@@ -1,34 +1,35 @@
-"""
-Advanced Model Performance Evaluator for New Training Pipeline
+"""Advanced Model Performance Evaluator for New Training Pipeline.
 
-This script provides comprehensive model evaluation with novel metrics and visualizations
-for models trained using the train_models.py script format.
+This script provides comprehensive model evaluation with novel metrics and
+visualizations for models trained using the train_models.py script format.
 """
-import sys
-import os
+import argparse
 import json
+import os
 import pickle
+import sys
+import warnings
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
-import warnings
-from sklearn.metrics import (
-    accuracy_score, precision_recall_fscore_support, roc_auc_score, 
-    confusion_matrix, classification_report, roc_curve, precision_recall_curve,
-    matthews_corrcoef, cohen_kappa_score, balanced_accuracy_score,
-    log_loss, brier_score_loss
-)
-from sklearn.calibration import calibration_curve
-from sklearn.model_selection import cross_val_score, StratifiedKFold
-from scipy import stats
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import plotly.express as px
+import plotly.graph_objects as go
+import seaborn as sns
 import torch
 import torch.nn as nn
+from plotly.subplots import make_subplots
+from scipy import stats
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import (
+    accuracy_score, balanced_accuracy_score, brier_score_loss,
+    classification_report, cohen_kappa_score, confusion_matrix, log_loss,
+    matthews_corrcoef, precision_recall_curve, precision_recall_fscore_support,
+    roc_auc_score, roc_curve
+)
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 
 warnings.filterwarnings('ignore')
 
@@ -38,13 +39,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 # Import FeatureExtractor from train_models to allow proper unpickling
 try:
     from train_models import FeatureExtractor, NeuralNetwork
-    print("Successfully imported FeatureExtractor and NeuralNetwork from train_models")
+    print("Successfully imported FeatureExtractor and NeuralNetwork "
+          "from train_models")
 except ImportError as e:
     print(f"Warning: Could not import from train_models: {e}")
     # Create a dummy FeatureExtractor class for unpickling
+
     class FeatureExtractor:
+        """Dummy FeatureExtractor for unpickling."""
+
         pass
+
     class NeuralNetwork:
+        """Dummy NeuralNetwork for unpickling."""
+
         pass
 
 class NewModelEvaluator:

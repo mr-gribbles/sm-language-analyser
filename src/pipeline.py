@@ -6,15 +6,16 @@ Bluesky platforms.
 """
 import time
 from datetime import datetime, timezone
+
 from src import config
-from src.core.data_cleaner import clean_text
-from src.core.llm_rewriter import rewrite_text_with_gemini
 from src.core.corpus_manager import (
     create_corpus_record,
     save_record_to_corpus,
 )
-from src.scrapers.reddit_scraper import get_random_text_post
+from src.core.data_cleaner import clean_text
+from src.core.llm_rewriter import rewrite_text_with_gemini
 from src.scrapers.bluesky_scraper import fetch_bluesky_timeline_page
+from src.scrapers.reddit_scraper import get_random_text_post
 
 
 def run_pipeline(
@@ -42,7 +43,8 @@ def run_pipeline(
         pipeline_type = "Unedited"
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
-    output_filename = f"{platform}_{'rewritten' if rewrite else 'original'}_{timestamp}.jsonl"
+    rewrite_suffix = 'rewritten' if rewrite else 'original'
+    output_filename = f"{platform}_{rewrite_suffix}_{timestamp}.jsonl"
 
     print(f"Starting {platform} {pipeline_type.lower()} collection")
     print(f"Collecting {num_posts_to_collect} posts")
@@ -51,12 +53,14 @@ def run_pipeline(
     if platform == "reddit":
         sample_limit = reddit_limit or config.REDDIT_SAMPLE_LIMIT
         _run_reddit_pipeline(
-            rewrite, output_dir, output_filename, num_posts_to_collect, sample_limit
+            rewrite, output_dir, output_filename, num_posts_to_collect, 
+            sample_limit
         )
     elif platform == "bluesky":
         sample_limit = bluesky_limit or config.BLUESKY_SAMPLE_LIMIT
         _run_bluesky_pipeline(
-            rewrite, output_dir, output_filename, num_posts_to_collect, sample_limit
+            rewrite, output_dir, output_filename, num_posts_to_collect, 
+            sample_limit
         )
 
     print(f"{platform} collection complete")
@@ -85,7 +89,8 @@ def _run_reddit_pipeline(
             try:
                 cleaned_text = clean_text(post.selftext)
             except TypeError as e:
-                print(f"Warning: Skipping post ID {post.id} due to invalid text content. Error: {e}")
+                print(f"Warning: Skipping post ID {post.id} due to invalid "
+                      f"text content. Error: {e}")
                 continue
 
             rewritten_text = None
@@ -116,7 +121,8 @@ def _run_reddit_pipeline(
             )
             save_record_to_corpus(record, output_dir, output_filename)
             collected_ids.add(post.id)
-            print(f"Collected Post {len(collected_ids)}/{num_posts_to_collect}. ID: {post.id}")
+            print(f"Collected Post {len(collected_ids)}/{num_posts_to_collect}. "
+                  f"ID: {post.id}")
         time.sleep(config.SLEEP_TIMER)
 
 def _run_bluesky_pipeline(
@@ -142,12 +148,15 @@ def _run_bluesky_pipeline(
     last_cursor = None
     while len(collected_uris) < num_posts_to_collect:
         if not post_buffer:
-            new_posts, cursor = fetch_bluesky_timeline_page(limit=sample_limit, cursor=cursor)
+            new_posts, cursor = fetch_bluesky_timeline_page(
+                limit=sample_limit, cursor=cursor
+            )
 
             if not new_posts and cursor == last_cursor:
                 empty_fetch_attempts += 1
                 if empty_fetch_attempts >= 3:
-                    print("No new posts found after multiple attempts with the same cursor. Stopping.")
+                    print("No new posts found after multiple attempts with "
+                          "the same cursor. Stopping.")
                     break
             elif new_posts:
                 empty_fetch_attempts = 0
@@ -155,10 +164,13 @@ def _run_bluesky_pipeline(
             last_cursor = cursor
 
             if not new_posts and cursor is None:
-                print("Failed to fetch new posts and no cursor returned. Stopping.")
+                print("Failed to fetch new posts and no cursor returned. "
+                      "Stopping.")
                 break
             
-            unique_new_posts = [p for p in new_posts if p.uri not in collected_uris]
+            unique_new_posts = [
+                p for p in new_posts if p.uri not in collected_uris
+            ]
             post_buffer.extend(unique_new_posts)
 
         if not post_buffer:
@@ -174,7 +186,8 @@ def _run_bluesky_pipeline(
         try:
             cleaned_text = clean_text(post.record.text)
         except TypeError as e:
-            print(f"Warning: Skipping post URI {post.uri} due to invalid text content. Error: {e}")
+            print(f"Warning: Skipping post URI {post.uri} due to invalid "
+                  f"text content. Error: {e}")
             continue
 
         rewritten_text = None
@@ -192,8 +205,13 @@ def _run_bluesky_pipeline(
             "author_did": post.author.did,
             "author_handle": post.author.handle,
         }
+        # Create title from text (truncated if too long)
+        title = (post.record.text[:70] + '...' 
+                if len(post.record.text) > 70 
+                else post.record.text)
+        
         original_content = {
-            "title": (post.record.text[:70] + '...') if len(post.record.text) > 70 else post.record.text,
+            "title": title,
             "raw_text": post.record.text,
             "cleaned_text": cleaned_text,
         }
@@ -206,5 +224,6 @@ def _run_bluesky_pipeline(
         )
         save_record_to_corpus(record, output_dir, output_filename)
         collected_uris.add(post.uri)
-        print(f"Collected Post {len(collected_uris)}/{num_posts_to_collect}. URI: {post.uri}")
+        print(f"Collected Post {len(collected_uris)}/{num_posts_to_collect}. "
+              f"URI: {post.uri}")
         time.sleep(config.SLEEP_TIMER)

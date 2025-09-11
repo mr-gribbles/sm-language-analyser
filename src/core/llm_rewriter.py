@@ -35,8 +35,8 @@ def rewrite_text_with_gemini(text_to_rewrite, model_name, prompt_template):
         prompt_template: The template for the prompt to be used with the model.
 
     Returns:
-        The rewritten text if successful, otherwise None. Returns None if
-        the prompt is blocked by safety filters or if an API error occurs.
+        str or None: The rewritten text if successful, otherwise None. Returns None if
+            the prompt is blocked by safety filters or if an API error occurs.
     """
     try:
         model = genai.GenerativeModel(model_name)
@@ -44,7 +44,8 @@ def rewrite_text_with_gemini(text_to_rewrite, model_name, prompt_template):
         
         response = model.generate_content(prompt)
         
-        # If the response has no 'candidates', it means the prompt was blocked by the safety filters.
+        # If the response has no 'candidates', it means the prompt was blocked
+        # by the safety filters.
         if not response.candidates:
             print("Warning: A post was blocked by the safety filter. Skipping.")
             return None

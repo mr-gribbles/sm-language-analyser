@@ -28,7 +28,7 @@ def create_corpus_record(
         prompt_template: Optional prompt template used for rewriting.
 
     Returns:
-        A structured corpus record dictionary in the official format.
+        dict: A structured corpus record dictionary in the official format.
     """
     record = {
         "corpus_item_id": str(uuid.uuid4()),
@@ -55,6 +55,9 @@ def save_record_to_corpus(record, directory, filename):
         record: The corpus record dictionary to save.
         directory: The directory where the record should be saved.
         filename: The name of the file to save the record in.
+        
+    Returns:
+        None
     """
     try:
         os.makedirs(directory, exist_ok=True)

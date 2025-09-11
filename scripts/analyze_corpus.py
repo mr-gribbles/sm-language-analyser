@@ -13,7 +13,9 @@ import sys
 
 import pandas as pd
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..')
+))
 
 from src.core.corpus_analyzer import run_full_analysis
 
@@ -43,15 +45,20 @@ def analyze_corpus_file(filepath: str):
                     record = json.loads(line)
                     
                     text_to_analyze = None
-                    if record.get("llm_transformation") and record["llm_transformation"].get("rewritten_text"):
+                    if (record.get("llm_transformation") and 
+                        record["llm_transformation"].get("rewritten_text")):
                         text_to_analyze = record["llm_transformation"]["rewritten_text"]
-                        if i == 0: analysis_type = "Rewritten Text"
+                        if i == 0:
+                            analysis_type = "Rewritten Text"
                     else:
                         original_content = record.get("original_content", {})
-                        text_to_analyze = original_content.get("cleaned_selftext") or original_content.get("cleaned_text")
-                        if i == 0: analysis_type = "Original Text"
+                        text_to_analyze = (original_content.get("cleaned_selftext") or
+                                         original_content.get("cleaned_text"))
+                        if i == 0:
+                            analysis_type = "Original Text"
 
-                    analysis_results = run_full_analysis(text_to_analyze) if text_to_analyze else {}
+                    analysis_results = (run_full_analysis(text_to_analyze) 
+                                      if text_to_analyze else {})
 
                     row = {
                         "corpus_item_id": record.get("corpus_item_id"),
@@ -75,7 +82,9 @@ def analyze_corpus_file(filepath: str):
         os.makedirs(output_dir, exist_ok=True)
         
         # Create a clean filename and save the CSV in the new directory
-        base_filename = os.path.basename(filepath).replace('.jsonl', '_analysis.csv')
+        base_filename = os.path.basename(filepath).replace(
+            '.jsonl', '_analysis.csv'
+        )
         output_csv_path = os.path.join(output_dir, base_filename)
         
         df.to_csv(output_csv_path, index=False)
@@ -87,8 +96,14 @@ def analyze_corpus_file(filepath: str):
         print(f"An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Analyze a text corpus file for linguistic metrics.")
-    parser.add_argument("filepath", type=str, help="The path to the .jsonl corpus file to analyze.")
+    parser = argparse.ArgumentParser(
+        description="Analyze a text corpus file for linguistic metrics."
+    )
+    parser.add_argument(
+        "filepath", 
+        type=str, 
+        help="The path to the .jsonl corpus file to analyze."
+    )
     
     args = parser.parse_args()
     

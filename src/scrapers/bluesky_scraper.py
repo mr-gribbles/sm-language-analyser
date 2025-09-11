@@ -49,8 +49,12 @@ def fetch_bluesky_timeline_page(limit=100, cursor=None):
             high_quality_text_posts = []
             for item in response.feed:
                 post = item.post
-                if not (isinstance(post.record, Record) and post.record.text and 'en' in (post.record.langs or [])):
+                # Check if post has valid record, text, and is in English
+                if not (isinstance(post.record, Record) and 
+                        post.record.text and 
+                        'en' in (post.record.langs or [])):
                     continue
+                # Skip posts with embedded images
                 if post.embed and isinstance(post.embed, EmbedImagesMain):
                     continue
                 
@@ -59,6 +63,7 @@ def fetch_bluesky_timeline_page(limit=100, cursor=None):
                 if len(words) < 5:
                     continue
                 
+                # Skip posts with too many hashtags
                 hashtags = [word for word in words if word.startswith('#')]
                 if len(words) > 0 and (len(hashtags) / len(words) > 0.5):
                     continue
@@ -69,12 +74,15 @@ def fetch_bluesky_timeline_page(limit=100, cursor=None):
 
         except exceptions.AtProtocolError as e:
             if e.response and e.response.status_code == 400:
-                print("Fatal: Received a 400 Bad Request error from Bluesky. This indicates an issue with the request itself (e.g., invalid cursor).")
+                print("Fatal: Received a 400 Bad Request error from Bluesky. "
+                      "This indicates an issue with the request itself "
+                      "(e.g., invalid cursor).")
                 print(f"Error details: {e.response.content}")
                 return [], None  # Stop immediately, no retry
             
             # For other network/API errors, proceed with retry logic
-            print(f"Warning: An error occurred while fetching from Bluesky. Attempt {attempt + 1}/{max_retries}.")
+            print(f"Warning: An error occurred while fetching from Bluesky. "
+                  f"Attempt {attempt + 1}/{max_retries}.")
             print(f"Error details: {e}")
             if attempt + 1 < max_retries:
                 wait_time = 30 * (attempt + 1)

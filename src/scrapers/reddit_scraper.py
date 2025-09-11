@@ -21,9 +21,9 @@ def get_random_text_post(subreddit_name, limit=100):
         limit: The maximum number of posts to fetch (default is 100).
 
     Returns:
-        A random pure text post object if available, otherwise None.
-        Returns None if no pure text posts are found or if the Reddit
-        client is not initialized.
+        praw.models.Submission or None: A random pure text post object if available, 
+            otherwise None. Returns None if no pure text posts are found or if the Reddit
+            client is not initialized.
     """
     if not reddit_client:
         print("Reddit instance not available.")
@@ -39,14 +39,18 @@ def get_random_text_post(subreddit_name, limit=100):
         # This will also exclude posts with very short text.
         pure_text_posts = [
             post for post in hot_posts 
-            if post.is_self and post.selftext and not any(ext in post.selftext.lower() for ext in IMAGE_EXTENSIONS)
+            if (post.is_self and post.selftext and 
+                not any(ext in post.selftext.lower() 
+                       for ext in IMAGE_EXTENSIONS))
         ]
         
         if pure_text_posts:
-            print(f"Found {len(pure_text_posts)} pure text posts. Selecting one at random.")
+            print(f"Found {len(pure_text_posts)} pure text posts. "
+                  f"Selecting one at random.")
             return random.choice(pure_text_posts)
         else:
-            print(f"No pure text posts found in the top {limit} posts of r/{subreddit_name}.")
+            print(f"No pure text posts found in the top {limit} posts of "
+                  f"r/{subreddit_name}.")
             return None
 
     except Exception as e:

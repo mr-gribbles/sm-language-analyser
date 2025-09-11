@@ -25,8 +25,8 @@ def initialize_reddit_client():
     Reddit API client.
 
     Returns:
-        An authenticated PRAW client instance if initialization is
-        successful, otherwise None.
+        praw.Reddit: An authenticated PRAW client instance if initialization is
+            successful, otherwise None.
     """
     if not all([CLIENT_ID, CLIENT_SECRET, USER_AGENT]):
         print("ERROR: Reddit credentials not found in .env file.")

@@ -38,7 +38,8 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
     # Use glob to find all files ending with .jsonl in the target directory
     source_files = glob.glob(os.path.join(directory, '*.jsonl'))
 
-    # Exclude the output file from the list of source files to prevent it from combining with itself
+    # Exclude the output file from the list of source files to prevent
+    # it from combining with itself
     if output_filepath in source_files:
         source_files.remove(output_filepath)
 
@@ -69,10 +70,12 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
                                 seen_post_ids.add(post_id)
                                 total_lines += 1
                         except json.JSONDecodeError:
-                            print(f"Warning: Could not decode JSON from line in {filename}: {line.strip()}")
+                            print(f"Warning: Could not decode JSON from line "
+                                  f"in {filename}: {line.strip()}")
 
         print("\n--- Combination Complete ---")
-        print(f"Successfully combined {len(source_files)} files into '{output_filename}'.")
+        print(f"Successfully combined {len(source_files)} files into "
+              f"'{output_filename}'.")
         print(f"The combined file contains {total_lines} records.")
 
         if delete_originals:
@@ -89,9 +92,19 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
 
 if __name__ == "__main__":
     # Set up command-line argument parsing to get the target directory
-    parser = argparse.ArgumentParser(description="Combine multiple .jsonl corpus files and delete the originals.")
-    parser.add_argument("directory", type=str, help="The path to the directory containing the .jsonl files to combine.")
-    parser.add_argument("--delete-originals", action="store_true", help="Delete the original source files after combining.")
+    parser = argparse.ArgumentParser(
+        description="Combine multiple .jsonl corpus files and delete the originals."
+    )
+    parser.add_argument(
+        "directory", 
+        type=str, 
+        help="The path to the directory containing the .jsonl files to combine."
+    )
+    parser.add_argument(
+        "--delete-originals", 
+        action="store_true", 
+        help="Delete the original source files after combining."
+    )
     
     args = parser.parse_args()
     
