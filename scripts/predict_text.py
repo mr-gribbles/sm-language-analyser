@@ -459,7 +459,7 @@ class ModelPredictor:
                 # Show all model predictions sorted by confidence
                 individual = details['individual_results']
                 
-                print(f"\n📋 ALL MODEL PREDICTIONS:")
+                print(f"\nALL MODEL PREDICTIONS:")
                 print("-" * 60)
                 
                 # Separate AI and Human predictions
@@ -572,7 +572,7 @@ def main():
                     # Show all model predictions sorted by confidence (same format as interactive mode)
                     individual = details['individual_results']
                     
-                    print(f"\n📋 ALL MODEL PREDICTIONS:")
+                    print(f"\nALL MODEL PREDICTIONS:")
                     print("-" * 60)
                     
                     # Separate AI and Human predictions
