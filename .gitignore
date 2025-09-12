@@ -137,8 +137,8 @@ corpora/
 
 # Data files
 models/
-models_corrected/
 plots/
+evaluation_results/
 test_file/
 *.json
 *.jsonl
