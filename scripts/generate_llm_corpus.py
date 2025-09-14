@@ -1,8 +1,8 @@
-"""Generate LLM-written text corpus for AI detection training.
+"""Generate LLM-written social media corpus for AI detection training.
 
-This script creates a corpus of LLM-generated academic-style text using various
+This script creates a corpus of LLM-generated social media posts using various
 prompting strategies to create diverse, realistic AI-generated content that
-pairs well with scraped academic papers.
+pairs well with scraped social media data.
 """
 
 import argparse
@@ -18,16 +18,16 @@ import os
 # Add the parent directory to the path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.core_logic.llm_text_generator import generate_text_with_gemini
-from src.core_logic.corpus_manager import save_record_to_corpus
+from src.core.llm_text_generator import generate_text_with_gemini
+from src.core.corpus_manager import save_record_to_corpus
 from src import config
 
 
-class LLMCorpusGenerator:
-    """Generator for creating diverse LLM-written academic text."""
+class SocialMediaCorpusGenerator:
+    """Generator for creating diverse LLM-written social media posts."""
     
     def __init__(self, model_name: str = "gemini-2.5-flash-lite"):
-        """Initialize the LLM corpus generator.
+        """Initialize the social media corpus generator.
         
         Args:
             model_name: Name of the LLM model to use.
@@ -35,232 +35,214 @@ class LLMCorpusGenerator:
         self.model_name = model_name
         self.generation_count = 0
     
-    def get_academic_prompts(self) -> List[Dict[str, Any]]:
-        """Get diverse prompts for generating academic-style text.
+    def get_social_media_prompts(self) -> List[Dict[str, Any]]:
+        """Get diverse prompts for generating social media posts.
         
         Returns:
             List of prompt dictionaries with templates and metadata.
         """
         prompts = [
-            # Computer Science & Technical Topics
+            # Twitter/X Style Posts
             {
-                "category": "cs_abstract_generation",
-                "template": "Write an academic abstract for a research paper about {topic}. Include background, methodology, results, and conclusions. Make it 150-250 words.",
+                "category": "twitter_opinion",
+                "template": "You are posting your opinion about {topic} on Twitter. Write a single authentic tweet (under 280 characters) expressing your personal view.",
                 "topics": [
-                    "machine learning optimization algorithms",
-                    "natural language processing for sentiment analysis",
-                    "computer vision applications in medical imaging",
-                    "deep reinforcement learning in robotics",
-                    "neural network architectures for time series prediction",
-                    "federated learning privacy preservation",
-                    "graph neural networks for social network analysis",
-                    "transformer models for code generation",
-                    "adversarial attacks on image classification",
-                    "quantum machine learning algorithms"
+                    "remote work vs office work",
+                    "artificial intelligence and job security",
+                    "climate change and individual responsibility",
+                    "social media's impact on mental health",
+                    "the rise of electric vehicles",
+                    "cryptocurrency and traditional banking",
+                    "online education vs traditional learning",
+                    "the gig economy and worker rights",
+                    "privacy concerns with tech companies",
+                    "sustainable fashion and fast fashion"
                 ]
             },
             {
-                "category": "cs_methodology_generation",
-                "template": "Write a methodology section for a research paper on {topic}. Describe the approach, experimental setup, and evaluation metrics. Make it 250-350 words.",
+                "category": "twitter_news_reaction",
+                "template": "You just heard about {topic}. Write a single Twitter post (under 280 characters) reacting to this news with your immediate thoughts.",
                 "topics": [
-                    "few-shot learning for image classification",
-                    "attention mechanisms in sequence-to-sequence models",
-                    "meta-learning for rapid adaptation",
-                    "self-supervised learning from unlabeled data",
-                    "neural architecture search optimization",
-                    "distributed training of large language models",
-                    "active learning for data-efficient training",
-                    "domain adaptation in computer vision",
-                    "multi-task learning with shared representations",
-                    "causal inference in machine learning"
-                ]
-            },
-            
-            # Psychology Topics
-            {
-                "category": "psychology_abstract_generation",
-                "template": "Write an academic abstract for a psychology research paper about {topic}. Include background, methodology, results, and conclusions. Make it 150-250 words.",
-                "topics": [
-                    "cognitive biases in decision-making processes",
-                    "the impact of social media on adolescent mental health",
-                    "neuroplasticity and learning in older adults",
-                    "attachment styles and romantic relationship satisfaction",
-                    "the effectiveness of mindfulness-based interventions for anxiety",
-                    "working memory capacity and academic performance",
-                    "cultural differences in emotional expression and regulation",
-                    "the role of sleep in memory consolidation",
-                    "behavioral interventions for addiction recovery",
-                    "developmental psychology of moral reasoning in children"
-                ]
-            },
-            {
-                "category": "psychology_methodology_generation",
-                "template": "Write a methodology section for a psychology study on {topic}. Describe participants, procedures, measures, and analysis plan. Make it 250-350 words.",
-                "topics": [
-                    "longitudinal study of personality development",
-                    "experimental investigation of stereotype threat",
-                    "cross-cultural comparison of parenting styles",
-                    "neuroimaging study of emotion regulation",
-                    "randomized controlled trial of therapy effectiveness",
-                    "observational study of child social behavior",
-                    "survey research on workplace stress and burnout",
-                    "meta-analysis of cognitive behavioral therapy outcomes",
-                    "qualitative study of trauma recovery experiences",
-                    "psychometric validation of a new assessment tool"
+                    "major tech company announcing layoffs",
+                    "a new environmental policy being announced",
+                    "a breakthrough in medical research",
+                    "changes in social media platform policies",
+                    "new economic policy changes",
+                    "a space exploration milestone",
+                    "a cybersecurity breach at a major company",
+                    "a new AI technology being released",
+                    "climate summit outcomes",
+                    "companies changing work-from-home policies"
                 ]
             },
             
-            # Philosophy Topics
+            # Reddit Style Posts
             {
-                "category": "philosophy_abstract_generation",
-                "template": "Write an academic abstract for a philosophy paper about {topic}. Include the philosophical problem, argument, and conclusions. Make it 150-250 words.",
+                "category": "reddit_discussion",
+                "template": "You want to start a discussion about {topic} on Reddit. Write a post that shares your thoughts and asks the community a genuine question. 100-300 words.",
                 "topics": [
-                    "the nature of consciousness and the hard problem",
-                    "moral responsibility in deterministic universes",
-                    "epistemic justification and the Gettier problem",
-                    "personal identity and psychological continuity",
-                    "the ethics of artificial intelligence and automation",
-                    "free will and moral accountability",
-                    "the problem of evil and theodicy",
-                    "virtue ethics and character development",
-                    "the nature of time and temporal experience",
-                    "distributive justice and economic inequality"
+                    "the ethics of AI in creative fields",
+                    "best practices for work-life balance",
+                    "the future of urban transportation",
+                    "sustainable living tips and tricks",
+                    "mental health resources and support",
+                    "the impact of social media algorithms",
+                    "career advice for young professionals",
+                    "the role of technology in education",
+                    "environmental activism and individual action",
+                    "financial planning for uncertain times"
                 ]
             },
             {
-                "category": "philosophy_argument_generation",
-                "template": "Write a philosophical argument about {topic}. Present the problem, develop your position, consider objections, and defend your view. Make it 300-400 words.",
+                "category": "reddit_experience_sharing",
+                "template": "You want to share your experience with {topic} on Reddit. Write a personal post telling your story authentically. 150-400 words.",
                 "topics": [
-                    "the moral status of non-human animals",
-                    "whether knowledge requires certainty",
-                    "the relationship between mind and body",
-                    "the foundations of moral obligation",
-                    "the nature of aesthetic experience",
-                    "political authority and the social contract",
-                    "the problem of induction in scientific reasoning",
-                    "environmental ethics and our duties to nature",
-                    "the meaning of life and human purpose",
-                    "the ethics of genetic enhancement"
-                ]
-            },
-            
-            # Business & Management Topics
-            {
-                "category": "business_abstract_generation",
-                "template": "Write an academic abstract for a business research paper about {topic}. Include background, methodology, findings, and implications. Make it 150-250 words.",
-                "topics": [
-                    "the impact of remote work on organizational culture",
-                    "sustainable business practices and financial performance",
-                    "digital transformation strategies in traditional industries",
-                    "consumer behavior in e-commerce environments",
-                    "leadership styles and employee engagement",
-                    "supply chain resilience during global disruptions",
-                    "the role of artificial intelligence in customer service",
-                    "corporate social responsibility and brand loyalty",
-                    "innovation management in startup ecosystems",
-                    "cross-cultural negotiations in international business"
-                ]
-            },
-            {
-                "category": "business_case_study_generation",
-                "template": "Write a business case study analysis of {topic}. Include situation analysis, key challenges, strategic options, and recommendations. Make it 300-400 words.",
-                "topics": [
-                    "a company's digital marketing transformation",
-                    "merger and acquisition integration challenges",
-                    "crisis management during a product recall",
-                    "entering emerging markets with cultural barriers",
-                    "implementing sustainable manufacturing processes",
-                    "managing organizational change during restructuring",
-                    "developing new products for changing demographics",
-                    "competitive strategy in disrupted industries",
-                    "building strategic partnerships and alliances",
-                    "managing stakeholder relationships during growth"
+                    "switching to a more sustainable lifestyle",
+                    "dealing with workplace burnout",
+                    "learning a new skill during the pandemic",
+                    "navigating career changes in tech",
+                    "mental health journey and self-care",
+                    "building better financial habits",
+                    "the challenges of remote work",
+                    "overcoming social media addiction",
+                    "finding work-life balance as a parent",
+                    "the journey to healthier eating habits"
                 ]
             },
             
-            # Economics Topics
+            # LinkedIn Style Posts
             {
-                "category": "economics_abstract_generation",
-                "template": "Write an academic abstract for an economics research paper about {topic}. Include research question, methodology, findings, and policy implications. Make it 150-250 words.",
+                "category": "linkedin_professional",
+                "template": "You're sharing your professional thoughts about {topic} on LinkedIn. Write a thoughtful post that would resonate with your professional network. 100-200 words.",
                 "topics": [
-                    "the effects of minimum wage increases on employment",
-                    "behavioral economics and consumer decision-making",
-                    "the impact of automation on labor markets",
-                    "monetary policy effectiveness during economic crises",
-                    "income inequality and economic growth",
-                    "the economics of climate change and carbon pricing",
-                    "international trade and economic development",
-                    "financial market volatility and investor behavior",
-                    "the gig economy and traditional employment models",
-                    "healthcare economics and policy reform"
+                    "the importance of continuous learning",
+                    "building effective remote teams",
+                    "navigating career transitions",
+                    "the future of workplace diversity",
+                    "leadership lessons from recent challenges",
+                    "the role of mentorship in career growth",
+                    "adapting to technological change",
+                    "building professional networks online",
+                    "the importance of emotional intelligence",
+                    "sustainable business practices"
                 ]
             },
             {
-                "category": "economics_analysis_generation",
-                "template": "Write an economic analysis of {topic}. Include theoretical framework, empirical evidence, and policy recommendations. Make it 300-400 words.",
+                "category": "linkedin_industry_insights",
+                "template": "You're posting on LinkedIn about trends you've noticed in {topic}. Share your professional insights and analysis. 150-300 words.",
                 "topics": [
-                    "the economic impact of universal basic income",
-                    "market failures in healthcare systems",
-                    "the economics of education and human capital",
-                    "fiscal policy responses to economic recessions",
-                    "the role of central banks in financial stability",
-                    "economic effects of immigration policies",
-                    "competition policy in digital markets",
-                    "the economics of renewable energy transition",
-                    "urban economics and housing affordability",
-                    "international development and poverty reduction"
+                    "artificial intelligence in the workplace",
+                    "the future of digital marketing",
+                    "remote work technology solutions",
+                    "sustainability in business operations",
+                    "the evolution of customer service",
+                    "data privacy and business compliance",
+                    "the impact of automation on jobs",
+                    "emerging trends in professional development",
+                    "the changing landscape of entrepreneurship",
+                    "innovation in financial technology"
                 ]
             },
             
-            # Interdisciplinary Topics
+            # Instagram/Facebook Style Posts
             {
-                "category": "interdisciplinary_abstract_generation",
-                "template": "Write an academic abstract for an interdisciplinary research paper about {topic}. Include multiple perspectives, methodology, and broader implications. Make it 150-250 words.",
+                "category": "instagram_lifestyle",
+                "template": "You're posting on Instagram about {topic}. Share your personal experience or thoughts in a lifestyle-focused way. Include hashtags. 50-150 words.",
                 "topics": [
-                    "the psychology of economic decision-making",
-                    "ethical implications of business automation",
-                    "philosophical foundations of psychological research",
-                    "economic analysis of mental health interventions",
-                    "business applications of behavioral psychology",
-                    "the ethics of economic inequality",
-                    "psychological factors in consumer economics",
-                    "philosophical perspectives on business ethics",
-                    "economic psychology of financial decision-making",
-                    "the intersection of technology, ethics, and society"
+                    "morning routine and productivity",
+                    "sustainable fashion choices",
+                    "healthy meal prep ideas",
+                    "mindfulness and meditation practices",
+                    "travel experiences and cultural insights",
+                    "fitness and wellness journey",
+                    "creative hobbies and self-expression",
+                    "home organization and minimalism",
+                    "supporting local businesses",
+                    "environmental conservation efforts"
+                ]
+            },
+            {
+                "category": "facebook_community",
+                "template": "You're posting in your local community Facebook group about {topic}. Write something helpful and community-focused. 100-250 words.",
+                "topics": [
+                    "local environmental initiatives",
+                    "community events and activities",
+                    "supporting small businesses locally",
+                    "parenting tips and experiences",
+                    "neighborhood safety and security",
+                    "local government and civic engagement",
+                    "community volunteering opportunities",
+                    "local food and restaurant recommendations",
+                    "educational resources for families",
+                    "community health and wellness programs"
+                ]
+            },
+            
+            # General Social Media Content
+            {
+                "category": "motivational_post",
+                "template": "You want to share something motivational about {topic} on social media. Write an inspiring post that encourages others. 50-150 words.",
+                "topics": [
+                    "overcoming challenges and setbacks",
+                    "pursuing personal goals and dreams",
+                    "the importance of self-care",
+                    "building resilience and mental strength",
+                    "embracing change and new opportunities",
+                    "the value of learning from failure",
+                    "finding purpose in daily life",
+                    "building meaningful relationships",
+                    "celebrating small wins and progress",
+                    "maintaining optimism during difficult times"
+                ]
+            },
+            {
+                "category": "educational_content",
+                "template": "You want to help people understand {topic} better. Create a social media post that explains it clearly and helpfully. 100-200 words.",
+                "topics": [
+                    "how climate change affects daily life",
+                    "the basics of personal finance",
+                    "understanding mental health and wellness",
+                    "the impact of social media algorithms",
+                    "sustainable living practices",
+                    "the importance of digital privacy",
+                    "how artificial intelligence works",
+                    "the benefits of renewable energy",
+                    "understanding cryptocurrency basics",
+                    "the psychology of habit formation"
                 ]
             }
         ]
         return prompts
     
-    def get_writing_style_variations(self) -> List[str]:
-        """Get different writing style instructions for variation.
+    def get_social_media_style_variations(self) -> List[str]:
+        """Get different social media writing style instructions for variation.
         
         Returns:
             List of style instruction strings.
         """
         styles = [
-            "Write in a formal academic tone with technical precision.",
-            "Use a clear, accessible writing style suitable for a broad scientific audience.",
-            "Adopt a concise, direct writing approach with minimal jargon.",
-            "Write with detailed explanations and comprehensive coverage of concepts.",
-            "Use an analytical writing style with critical evaluation of ideas.",
-            "Employ a structured, methodical approach to presenting information.",
-            "Write with emphasis on practical applications and real-world relevance.",
-            "Use a comparative approach, contrasting different methods and approaches.",
-            "Adopt an exploratory tone that discusses open questions and future directions.",
-            "Write with focus on interdisciplinary connections and broader implications."
+            "Write in a casual, conversational tone as if talking to a friend.",
+            "Use an enthusiastic and energetic voice with emojis where appropriate.",
+            "Adopt a professional but approachable tone suitable for LinkedIn.",
+            "Write with a humorous and witty style that engages readers.",
+            "Use an authentic, personal voice sharing genuine thoughts and experiences.",
+            "Employ a motivational and inspiring tone that uplifts the audience.",
+            "Write with a question-asking, community-engaging style.",
+            "Use a storytelling approach that makes the content relatable.",
+            "Adopt an informative but accessible tone for educational content.",
+            "Write with a trendy, current style that reflects social media culture."
         ]
         return styles
     
-    def generate_academic_text(self, prompt_info: Dict[str, Any], style: str) -> str:
-        """Generate academic text using LLM.
+    def generate_social_media_post(self, prompt_info: Dict[str, Any], style: str) -> str:
+        """Generate social media post using LLM.
         
         Args:
             prompt_info: Dictionary containing prompt template and topic.
             style: Writing style instruction.
             
         Returns:
-            Generated academic text.
+            Generated social media post.
         """
         # Select random topic
         topic = random.choice(prompt_info["topics"])
@@ -281,10 +263,10 @@ class LLMCorpusGenerator:
     
     def create_corpus_entry(self, generated_text: str, prompt_info: Dict[str, Any], 
                           topic: str, style: str) -> Dict[str, Any]:
-        """Create a corpus entry for generated text.
+        """Create a corpus entry for generated social media post.
         
         Args:
-            generated_text: The LLM-generated text.
+            generated_text: The LLM-generated social media post.
             prompt_info: Information about the prompt used.
             topic: The topic that was generated.
             style: The writing style used.
@@ -298,9 +280,10 @@ class LLMCorpusGenerator:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         entry_id = f"llm_generated_{timestamp}_{self.generation_count:04d}"
         
-        # Extract title from the generated text (first line or sentence)
+        # Extract title/preview from the generated text (first line or sentence, truncated)
         lines = generated_text.split('\n')
-        title = lines[0][:100] + "..." if len(lines[0]) > 100 else lines[0]
+        first_line = lines[0] if lines else generated_text
+        title = first_line[:100] + "..." if len(first_line) > 100 else first_line
         
         corpus_entry = {
             'id': entry_id,
@@ -309,10 +292,11 @@ class LLMCorpusGenerator:
                 'raw_text': generated_text,
                 'cleaned_text': generated_text,
                 'title': title,
-                'abstract': generated_text,  # For academic text, the whole text can serve as abstract
-                'authors': ['AI Generated'],
-                'categories': [f"generated.{prompt_info['category']}"],
-                'paper_id': entry_id,
+                'content': generated_text,  # For social media posts, content is the main field
+                'author': 'AI Generated',
+                'platform': prompt_info['category'].split('_')[0],  # Extract platform from category
+                'post_type': prompt_info['category'],
+                'post_id': entry_id,
                 'url': f"generated://{entry_id}",
                 'published_date': datetime.now(timezone.utc).isoformat(),
             },
@@ -325,7 +309,8 @@ class LLMCorpusGenerator:
                 'generation_category': prompt_info['category'],
                 'generation_topic': topic,
                 'writing_style': style,
-                'model_used': self.model_name
+                'model_used': self.model_name,
+                'platform_category': prompt_info['category'].split('_')[0]
             },
             'processing_info': {
                 'collected_at': datetime.now(timezone.utc).isoformat(),
@@ -339,23 +324,23 @@ class LLMCorpusGenerator:
     
     def generate_corpus(self, num_texts: int, output_dir: str, output_file: str,
                        delay: float = 2.0) -> int:
-        """Generate a corpus of LLM-written academic text.
+        """Generate a corpus of LLM-written social media posts.
         
         Args:
-            num_texts: Number of texts to generate.
+            num_texts: Number of posts to generate.
             output_dir: Output directory for the corpus.
             output_file: Output filename.
             delay: Delay between API calls.
             
         Returns:
-            Number of texts successfully generated.
+            Number of posts successfully generated.
         """
-        prompts = self.get_academic_prompts()
-        styles = self.get_writing_style_variations()
+        prompts = self.get_social_media_prompts()
+        styles = self.get_social_media_style_variations()
         
         generated_count = 0
         
-        print(f"Generating {num_texts} academic texts using {self.model_name}")
+        print(f"Generating {num_texts} social media posts using {self.model_name}")
         print(f"Output: {output_dir}/{output_file}")
         
         for i in range(num_texts):
@@ -367,10 +352,10 @@ class LLMCorpusGenerator:
                 
                 print(f"Generating {i+1}/{num_texts}: {prompt_info['category']}")
                 
-                # Generate text
-                generated_text = self.generate_academic_text(prompt_info, style)
+                # Generate post
+                generated_text = self.generate_social_media_post(prompt_info, style)
                 
-                if generated_text and len(generated_text.strip()) > 50:
+                if generated_text and len(generated_text.strip()) > 10:  # Lower threshold for social media
                     # Create corpus entry
                     corpus_entry = self.create_corpus_entry(
                         generated_text, prompt_info, topic, style
@@ -389,24 +374,24 @@ class LLMCorpusGenerator:
                     time.sleep(delay)
                     
             except Exception as e:
-                print(f"Error generating text {i+1}: {e}")
+                print(f"Error generating post {i+1}: {e}")
                 continue
         
-        print(f"Generated {generated_count}/{num_texts} texts successfully")
+        print(f"Generated {generated_count}/{num_texts} posts successfully")
         return generated_count
 
 
 def main():
-    """Main function for LLM corpus generation."""
+    """Main function for social media corpus generation."""
     parser = argparse.ArgumentParser(
-        description="Generate LLM-written academic text corpus for AI detection training"
+        description="Generate LLM-written social media corpus for AI detection training"
     )
     
     parser.add_argument(
-        "--num-texts", "-n",
+        "--num-posts", "-n",
         type=int,
         default=100,
-        help="Number of texts to generate (default: 100)"
+        help="Number of social media posts to generate (default: 100)"
     )
     
     parser.add_argument(
@@ -419,8 +404,8 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="corpora/llm_generated",
-        help="Output directory (default: corpora/llm_generated)"
+        default="corpora/llm_generated_social_media",
+        help="Output directory (default: corpora/llm_generated_social_media)"
     )
     
     parser.add_argument(
@@ -441,29 +426,29 @@ def main():
     # Generate output filename if not provided
     if not args.output_file:
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M%S")
-        args.output_file = f"llm_generated_academic_{timestamp}.jsonl"
+        args.output_file = f"llm_generated_social_media_{timestamp}.jsonl"
     
     # Create output directory
     output_path = Path(args.output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
     # Initialize generator
-    generator = LLMCorpusGenerator(model_name=args.model)
+    generator = SocialMediaCorpusGenerator(model_name=args.model)
     
     # Generate corpus
     try:
         generated_count = generator.generate_corpus(
-            num_texts=args.num_texts,
+            num_texts=args.num_posts,
             output_dir=args.output_dir,
             output_file=args.output_file,
             delay=args.delay
         )
         
         if generated_count > 0:
-            print(f"Corpus generation complete")
-            print(f"Generated {generated_count} texts saved to: {args.output_dir}/{args.output_file}")
+            print(f"Social media corpus generation complete")
+            print(f"Generated {generated_count} posts saved to: {args.output_dir}/{args.output_file}")
         else:
-            print(f"No texts were generated successfully")
+            print(f"No posts were generated successfully")
             
     except KeyboardInterrupt:
         print(f"Generation interrupted by user")
