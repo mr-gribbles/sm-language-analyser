@@ -743,23 +743,101 @@ class ComprehensiveModelTrainer:
             print(f"CV failed for {model_name}: {e}")
             return {'cv_accuracy_mean': 0, 'cv_accuracy_std': 0}
     
+    def get_model_type(self, model, model_name: str) -> str:
+        """Get descriptive model type based on the actual model class."""
+        if isinstance(model, nn.Module):
+            return 'neural_network'
+        
+        # Get the class name and convert to descriptive type
+        class_name = model.__class__.__name__.lower()
+        
+        # SVM variants
+        if 'svc' in class_name or 'svm' in model_name.lower():
+            return 'svm'
+        
+        # Tree-based models
+        if 'randomforest' in class_name:
+            return 'random_forest'
+        if 'extratrees' in class_name or 'extratree' in class_name:
+            return 'extra_trees'
+        if 'decisiontree' in class_name:
+            return 'decision_tree'
+        if 'gradientboosting' in class_name:
+            return 'gradient_boosting'
+        if 'histgradientboosting' in class_name:
+            return 'hist_gradient_boosting'
+        if 'adaboost' in class_name:
+            return 'adaboost'
+        if 'xgb' in class_name:
+            return 'xgboost'
+        if 'lgbm' in class_name:
+            return 'lightgbm'
+        if 'catboost' in class_name:
+            return 'catboost'
+        
+        # Linear models
+        if 'logisticregression' in class_name:
+            return 'logistic_regression'
+        if 'ridge' in class_name:
+            return 'ridge'
+        if 'sgd' in class_name:
+            return 'sgd'
+        if 'perceptron' in class_name:
+            return 'perceptron'
+        if 'passiveaggressive' in class_name:
+            return 'passive_aggressive'
+        
+        # Naive Bayes
+        if 'naivebayes' in class_name or 'nb' in class_name:
+            return 'naive_bayes'
+        
+        # Neural Networks
+        if 'mlp' in class_name:
+            return 'mlp'
+        
+        # Distance-based
+        if 'kneighbors' in class_name or 'knn' in model_name.lower():
+            return 'knn'
+        if 'nearestcentroid' in class_name:
+            return 'nearest_centroid'
+        
+        # Discriminant Analysis
+        if 'discriminant' in class_name:
+            return 'discriminant_analysis'
+        
+        # Ensemble
+        if 'voting' in class_name:
+            return 'voting'
+        if 'stacking' in class_name:
+            return 'stacking'
+        if 'bagging' in class_name:
+            return 'bagging'
+        if 'calibrated' in class_name:
+            return 'calibrated'
+        
+        # Default fallback
+        return 'sklearn'
+    
     def save_model(self, model, model_name: str, feature_extractor: FeatureExtractor):
-        """Save model with consistent format."""
+        """Save model with descriptive model type."""
         model_path = self.output_dir / f"{model_name}.pkl"
+        
+        # Get descriptive model type
+        model_type = self.get_model_type(model, model_name)
         
         if isinstance(model, nn.Module):
             # Save neural network
             model_data = {
-                'model_type': 'neural_network',
+                'model_type': model_type,
                 'model_state_dict': model.state_dict(),
                 'model_architecture': str(model),
                 'feature_extractor': feature_extractor,
                 'input_dim': next(model.parameters()).shape[1] if list(model.parameters()) else 0
             }
         else:
-            # Save scikit-learn model
+            # Save scikit-learn model with descriptive type
             model_data = {
-                'model_type': 'sklearn',
+                'model_type': model_type,
                 'model': model,
                 'feature_extractor': feature_extractor
             }
@@ -767,10 +845,110 @@ class ComprehensiveModelTrainer:
         with open(model_path, 'wb') as f:
             pickle.dump(model_data, f)
         
-        print(f"Saved {model_name} to {model_path}")
+        print(f"Saved {model_name} to {model_path} (type: {model_type})")
     
-    def train_all_models(self, human_file: str, ai_file: str, test_size: float = 0.2):
-        """Train all models and evaluate performance."""
+    def list_available_models(self):
+        """List all available models organized by category."""
+        print("=" * 80)
+        print("AVAILABLE MODELS AND CATEGORIES")
+        print("=" * 80)
+        
+        # Get all models
+        all_models = self.prepare_all_models()
+        
+        # Organize by category
+        categories = {
+            'svm': [name for name in all_models if 'svm' in name],
+            'tree': [name for name in all_models if any(x in name for x in 
+                    ['forest', 'tree', 'boosting', 'adaboost'])],
+            'linear': [name for name in all_models if any(x in name for x in 
+                      ['logistic', 'ridge', 'sgd', 'perceptron', 'passive'])],
+            'naive_bayes': [name for name in all_models if 'naive_bayes' in name],
+            'neural': [name for name in all_models if any(x in name for x in 
+                      ['neural_network', 'mlp'])],
+            'ensemble': [name for name in all_models if any(x in name for x in 
+                        ['voting', 'stacking', 'bagging'])],
+            'distance': [name for name in all_models if any(x in name for x in 
+                        ['knn', 'nearest', 'centroid'])],
+            'external': [name for name in all_models if any(x in name for x in 
+                        ['xgboost', 'lightgbm', 'catboost'])],
+            'other': [name for name in all_models if not any(
+                any(keyword in name for keyword in category_keywords) 
+                for category_keywords in [
+                    ['svm'], ['forest', 'tree', 'boosting', 'adaboost'],
+                    ['logistic', 'ridge', 'sgd', 'perceptron', 'passive'],
+                    ['naive_bayes'], ['neural_network', 'mlp'],
+                    ['voting', 'stacking', 'bagging'],
+                    ['knn', 'nearest', 'centroid'],
+                    ['xgboost', 'lightgbm', 'catboost']
+                ]
+            )]
+        }
+        
+        for category, models in categories.items():
+            if models:
+                print(f"\n{category.upper()} ({len(models)} models):")
+                for model in sorted(models):
+                    print(f"  • {model}")
+        
+        print(f"\nTotal: {len(all_models)} models available")
+        print("\nUsage examples:")
+        print("  python train_models.py --human-file human.jsonl --ai-file ai.jsonl --categories svm tree")
+        print("  python train_models.py --human-file human.jsonl --ai-file ai.jsonl --models random_forest_default svm_rbf")
+    
+    def filter_models_by_selection(self, all_models: Dict[str, Any], 
+                                 specific_models: Optional[List[str]] = None,
+                                 model_categories: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Filter models based on user selection."""
+        if not specific_models and not model_categories:
+            # Return all models if no selection specified
+            return all_models
+        
+        selected_models = {}
+        
+        # Add specific models
+        if specific_models:
+            for model_name in specific_models:
+                if model_name in all_models:
+                    selected_models[model_name] = all_models[model_name]
+                    print(f"✓ Selected specific model: {model_name}")
+                else:
+                    print(f"✗ Model not found: {model_name}")
+        
+        # Add models from categories
+        if model_categories:
+            category_map = {
+                'svm': lambda name: 'svm' in name,
+                'tree': lambda name: any(x in name for x in ['forest', 'tree', 'boosting', 'adaboost']),
+                'linear': lambda name: any(x in name for x in ['logistic', 'ridge', 'sgd', 'perceptron', 'passive']),
+                'naive_bayes': lambda name: 'naive_bayes' in name,
+                'neural': lambda name: any(x in name for x in ['neural_network', 'mlp']),
+                'ensemble': lambda name: any(x in name for x in ['voting', 'stacking', 'bagging']),
+                'distance': lambda name: any(x in name for x in ['knn', 'nearest', 'centroid']),
+                'external': lambda name: any(x in name for x in ['xgboost', 'lightgbm', 'catboost']),
+            }
+            
+            for category in model_categories:
+                if category in category_map:
+                    category_models = {name: model for name, model in all_models.items() 
+                                     if category_map[category](name)}
+                    selected_models.update(category_models)
+                    print(f"✓ Selected {len(category_models)} models from category: {category}")
+                else:
+                    print(f"✗ Unknown category: {category}")
+                    print(f"Available categories: {list(category_map.keys())}")
+        
+        if not selected_models:
+            print("No models selected! Training all models...")
+            return all_models
+        
+        print(f"Training {len(selected_models)} selected models")
+        return selected_models
+    
+    def train_all_models(self, human_file: str, ai_file: str, test_size: float = 0.2,
+                        specific_models: Optional[List[str]] = None,
+                        model_categories: Optional[List[str]] = None):
+        """Train selected models and evaluate performance."""
         print("=" * 80)
         print("Ultra-Comprehensive AI vs Human Text Classification Training Pipeline")
         print(f"Training 50+ machine learning models...")
@@ -799,11 +977,14 @@ class ComprehensiveModelTrainer:
         print(f"Test set: {X_test.shape[0]} samples")
         print(f"Features: {X_train.shape[1]}")
         
-        # Prepare all sklearn models
-        sklearn_models = self.prepare_all_models()
+        # Prepare and filter models based on selection
+        all_sklearn_models = self.prepare_all_models()
+        sklearn_models = self.filter_models_by_selection(
+            all_sklearn_models, specific_models, model_categories
+        )
         
-        # Train sklearn models
-        print(f"\nTraining {len(sklearn_models)} sklearn models...")
+        # Train selected sklearn models
+        print(f"\nTraining {len(sklearn_models)} selected sklearn models...")
         print("-" * 60)
         
         for model_name, model in sklearn_models.items():
@@ -1034,20 +1215,49 @@ class ComprehensiveModelTrainer:
 
 def main():
     """Main training function."""
-    parser = argparse.ArgumentParser(description='Train comprehensive AI vs Human text classifiers')
+    parser = argparse.ArgumentParser(
+        description='Train comprehensive AI vs Human text classifiers',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Model Selection Examples:
+  # Train all models (default)
+  python train_models.py --human-file human.jsonl --ai-file ai.jsonl
+
+  # Train specific models
+  python train_models.py --human-file human.jsonl --ai-file ai.jsonl --models random_forest_default svm_rbf
+
+  # Train model categories
+  python train_models.py --human-file human.jsonl --ai-file ai.jsonl --categories svm tree
+
+  # Train one model that failed
+  python train_models.py --human-file human.jsonl --ai-file ai.jsonl --models hist_gradient_boosting
+
+Available categories: svm, tree, linear, naive_bayes, neural, ensemble, distance, external
+        """)
+    
     parser.add_argument('--human-file', required=True, help='Path to human texts JSONL file')
     parser.add_argument('--ai-file', required=True, help='Path to AI texts JSONL file')
     parser.add_argument('--test-size', type=float, default=0.2, help='Test set size (default: 0.2)')
     parser.add_argument('--output-dir', default='models', help='Output directory for models')
     parser.add_argument('--results-dir', default='results', help='Output directory for results')
     
+    # Model selection arguments
+    parser.add_argument('--models', nargs='+', help='Specific model names to train')
+    parser.add_argument('--categories', nargs='+', help='Model categories to train (svm, tree, linear, etc.)')
+    parser.add_argument('--list-models', action='store_true', help='List all available models and exit')
+    
     args = parser.parse_args()
     
     # Initialize trainer
     trainer = ComprehensiveModelTrainer(args.output_dir, args.results_dir)
     
-    # Train all models
-    trainer.train_all_models(args.human_file, args.ai_file, args.test_size)
+    if args.list_models:
+        trainer.list_available_models()
+        return
+    
+    # Train models (all or selected)
+    trainer.train_all_models(args.human_file, args.ai_file, args.test_size, 
+                           specific_models=args.models, model_categories=args.categories)
 
 
 if __name__ == "__main__":

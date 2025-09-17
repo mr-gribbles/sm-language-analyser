@@ -28,6 +28,18 @@ from sklearn.pipeline import Pipeline, FeatureUnion
 import scipy.sparse as sp
 
 
+class SparseToDenseTransformer(BaseEstimator, TransformerMixin):
+    """Convert sparse matrices to dense arrays (module-level class for pickling)."""
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, X):
+        if hasattr(X, 'toarray'):
+            return X.toarray()
+        return X
+
+
 class AdvancedLinguisticFeatureExtractor(BaseEstimator, TransformerMixin):
     """Extract comprehensive linguistic features from text."""
     
@@ -546,10 +558,12 @@ class EnhancedFeatureExtractor(BaseEstimator, TransformerMixin):
         # Note: Dimensionality reduction will be added after we know the actual feature count
         # This is handled in the fit process below
         
-        # 5. Scaling (handle sparse matrices from TF-IDF)
+        # 5. Convert to dense and apply scaling (use module-level class for pickling)
+        steps.append(('to_dense', SparseToDenseTransformer()))
+        
+        # Apply scaling after converting to dense
         if self.scaler_type == 'standard':
-            # Use with_mean=False to handle sparse matrices
-            self.scaler = StandardScaler(with_mean=False)
+            self.scaler = StandardScaler()
         elif self.scaler_type == 'minmax':
             self.scaler = MinMaxScaler()
         elif self.scaler_type == 'robust':
