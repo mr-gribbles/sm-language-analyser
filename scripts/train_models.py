@@ -338,6 +338,43 @@ class ComprehensiveModelTrainer:
         self.feature_extractor = FeatureExtractor()
         self.models = {}
         self.results = {}
+    
+    def get_existing_models(self) -> List[str]:
+        """Get list of existing model files in the output directory."""
+        if not self.output_dir.exists():
+            return []
+        
+        existing_models = []
+        for model_file in self.output_dir.glob("*.pkl"):
+            model_name = model_file.stem  # Remove .pkl extension
+            existing_models.append(model_name)
+        
+        return existing_models
+    
+    def filter_existing_models(self, all_models: Dict[str, Any], skip_existing: bool = False) -> Dict[str, Any]:
+        """Filter out models that already exist if skip_existing is True."""
+        if not skip_existing:
+            return all_models
+        
+        existing_models = self.get_existing_models()
+        filtered_models = {}
+        skipped_count = 0
+        
+        for model_name, model in all_models.items():
+            if model_name not in existing_models:
+                filtered_models[model_name] = model
+            else:
+                skipped_count += 1
+        
+        if skipped_count > 0:
+            print(f"Skipping {skipped_count} existing models: {', '.join(existing_models)}")
+        
+        if not filtered_models:
+            print("All models already exist! Use --retrain to force retraining.")
+        else:
+            print(f"Training {len(filtered_models)} new models")
+        
+        return filtered_models
         
     def load_data(self, human_file: str, ai_file: str) -> Tuple[List[str], List[int]]:
         """Load and prepare training data from the actual JSONL format."""
@@ -947,7 +984,8 @@ class ComprehensiveModelTrainer:
     
     def train_all_models(self, human_file: str, ai_file: str, test_size: float = 0.2,
                         specific_models: Optional[List[str]] = None,
-                        model_categories: Optional[List[str]] = None):
+                        model_categories: Optional[List[str]] = None,
+                        skip_existing: bool = False):
         """Train selected models and evaluate performance."""
         print("=" * 80)
         print("Ultra-Comprehensive AI vs Human Text Classification Training Pipeline")
@@ -982,6 +1020,9 @@ class ComprehensiveModelTrainer:
         sklearn_models = self.filter_models_by_selection(
             all_sklearn_models, specific_models, model_categories
         )
+        
+        # Filter out existing models if requested
+        sklearn_models = self.filter_existing_models(sklearn_models, skip_existing)
         
         # Train selected sklearn models
         print(f"\nTraining {len(sklearn_models)} selected sklearn models...")
@@ -1245,6 +1286,7 @@ Available categories: svm, tree, linear, naive_bayes, neural, ensemble, distance
     parser.add_argument('--models', nargs='+', help='Specific model names to train')
     parser.add_argument('--categories', nargs='+', help='Model categories to train (svm, tree, linear, etc.)')
     parser.add_argument('--list-models', action='store_true', help='List all available models and exit')
+    parser.add_argument('--skip-existing', action='store_true', help='Skip training models that already exist in the models folder')
     
     args = parser.parse_args()
     
@@ -1257,7 +1299,8 @@ Available categories: svm, tree, linear, naive_bayes, neural, ensemble, distance
     
     # Train models (all or selected)
     trainer.train_all_models(args.human_file, args.ai_file, args.test_size, 
-                           specific_models=args.models, model_categories=args.categories)
+                           specific_models=args.models, model_categories=args.categories,
+                           skip_existing=args.skip_existing)
 
 
 if __name__ == "__main__":
