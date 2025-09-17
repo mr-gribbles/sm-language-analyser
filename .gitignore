@@ -139,6 +139,7 @@ corpora/
 models/
 plots/
 evaluation_results/
+interpretability_results/ 
 test_file/
 *.json
 *.jsonl
