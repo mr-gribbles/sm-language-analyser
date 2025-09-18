@@ -98,8 +98,17 @@ class NewModelEvaluator:
             model_type = model_data.get('model_type', 'unknown')
             feature_extractor = model_data.get('feature_extractor', None)
             
-            if model_type == 'sklearn':
-                # Sklearn model
+            # Handle sklearn models (both old 'sklearn' and new specific types)
+            sklearn_types = {
+                'sklearn', 'adaboost', 'decision_tree', 'random_forest', 
+                'gradient_boosting', 'extra_trees', 'svm', 'logistic_regression',
+                'ridge', 'linear_svc', 'sgd', 'perceptron', 'passive_aggressive',
+                'naive_bayes', 'linear_discriminant', 'nearest_centroid',
+                'calibrated', 'xgboost', 'lightgbm', 'catboost'
+            }
+            
+            if model_type in sklearn_types:
+                # Sklearn-compatible model
                 model = model_data.get('model')
                 if model is None:
                     print(f"Warning: No model found in {model_path.name}")
@@ -290,6 +299,13 @@ class NewModelEvaluator:
                             if 'llm_transformation' in data and isinstance(data['llm_transformation'], dict):
                                 if 'rewritten_text' in data['llm_transformation']:
                                     text = data['llm_transformation']['rewritten_text'].strip()
+                            # Handle LLM-generated format in AI test file
+                            elif 'original_content' in data and isinstance(data['original_content'], dict):
+                                # Try different text fields from LLM-generated format
+                                for field in ['cleaned_text', 'content', 'raw_text']:
+                                    if field in data['original_content']:
+                                        text = data['original_content'][field].strip()
+                                        break
                             # Handle old format: rewritten_text
                             elif 'rewritten_text' in data:
                                 text = data['rewritten_text'].strip()
@@ -395,6 +411,13 @@ class NewModelEvaluator:
                             if 'llm_transformation' in data and isinstance(data['llm_transformation'], dict):
                                 if 'rewritten_text' in data['llm_transformation']:
                                     text = data['llm_transformation']['rewritten_text'].strip()
+                            # Handle LLM-generated format in AI test file
+                            elif 'original_content' in data and isinstance(data['original_content'], dict):
+                                # Try different text fields from LLM-generated format
+                                for field in ['cleaned_text', 'content', 'raw_text']:
+                                    if field in data['original_content']:
+                                        text = data['original_content'][field].strip()
+                                        break
                             # Handle old format: rewritten_text
                             elif 'rewritten_text' in data:
                                 text = data['rewritten_text'].strip()

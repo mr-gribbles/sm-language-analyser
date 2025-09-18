@@ -121,7 +121,7 @@ class FeatureExtractor:
             stop_words='english',
             lowercase=True,
             strip_accents='unicode',
-            token_pattern=r'\b[a-zA-Z][a-zA-Z0-9]*\b',  # Better pattern
+            token_pattern=r"(?u)\b\w+\b",  # Fixed pattern that handles contractions properly
             sublinear_tf=True  # Log-scaled frequencies
         )
         word_features = self.word_vectorizer.fit_transform(texts).toarray()
@@ -856,33 +856,77 @@ class ComprehensiveModelTrainer:
         return 'sklearn'
     
     def save_model(self, model, model_name: str, feature_extractor: FeatureExtractor):
-        """Save model with descriptive model type."""
+        """Save model with descriptive model type and preserve feature names."""
         model_path = self.output_dir / f"{model_name}.pkl"
         
         # Get descriptive model type
         model_type = self.get_model_type(model, model_name)
         
+        # Extract and preserve feature names for interpretability
+        feature_names = []
+        word_feature_names = []
+        char_feature_names = []
+        
+        try:
+            if feature_extractor and hasattr(feature_extractor, 'enhanced_extractor'):
+                enhanced_extractor = feature_extractor.enhanced_extractor
+                if enhanced_extractor:
+                    # Get comprehensive feature names
+                    try:
+                        feature_names = enhanced_extractor.get_feature_names_out()
+                        print(f"  Extracted {len(feature_names)} feature names for {model_name}")
+                    except Exception as e:
+                        print(f"  Warning: Could not extract feature names for {model_name}: {e}")
+                    
+                    # Get specific word and character feature names
+                    try:
+                        word_feature_names = enhanced_extractor.get_word_feature_names()
+                        char_feature_names = enhanced_extractor.get_char_feature_names()
+                        print(f"  Extracted {len(word_feature_names)} word features and {len(char_feature_names)} char features")
+                    except Exception as e:
+                        print(f"  Warning: Could not extract word/char feature names for {model_name}: {e}")
+                        
+                        # Try alternative approach to get vocabularies
+                        try:
+                            if hasattr(enhanced_extractor, '_word_vocabulary') and enhanced_extractor._word_vocabulary:
+                                word_feature_names = list(enhanced_extractor._word_vocabulary.keys())
+                                print(f"  Retrieved {len(word_feature_names)} word features from stored vocabulary")
+                            
+                            if hasattr(enhanced_extractor, '_char_vocabulary') and enhanced_extractor._char_vocabulary:
+                                char_feature_names = list(enhanced_extractor._char_vocabulary.keys())
+                                print(f"  Retrieved {len(char_feature_names)} char features from stored vocabulary")
+                        except Exception as e2:
+                            print(f"  Alternative vocabulary extraction also failed: {e2}")
+        except Exception as e:
+            print(f"  Warning: Feature name extraction failed for {model_name}: {e}")
+        
         if isinstance(model, nn.Module):
-            # Save neural network
+            # Save neural network with feature information
             model_data = {
                 'model_type': model_type,
                 'model_state_dict': model.state_dict(),
                 'model_architecture': str(model),
                 'feature_extractor': feature_extractor,
+                'feature_names': feature_names,
+                'word_feature_names': word_feature_names,
+                'char_feature_names': char_feature_names,
                 'input_dim': next(model.parameters()).shape[1] if list(model.parameters()) else 0
             }
         else:
-            # Save scikit-learn model with descriptive type
+            # Save scikit-learn model with descriptive type and feature information
             model_data = {
                 'model_type': model_type,
                 'model': model,
-                'feature_extractor': feature_extractor
+                'feature_extractor': feature_extractor,
+                'feature_names': feature_names,
+                'word_feature_names': word_feature_names,
+                'char_feature_names': char_feature_names
             }
         
         with open(model_path, 'wb') as f:
             pickle.dump(model_data, f)
         
-        print(f"Saved {model_name} to {model_path} (type: {model_type})")
+        print(f"Saved {model_name} to {model_path} (type: {model_type}, {len(feature_names)} features)")
     
     def list_available_models(self):
         """List all available models organized by category."""

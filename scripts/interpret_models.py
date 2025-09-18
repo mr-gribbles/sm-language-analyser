@@ -112,7 +112,16 @@ class ModelInterpretabilityAnalyzer:
             model_type = model_data.get('model_type', 'sklearn')
             feature_extractor = model_data.get('feature_extractor', None)
             
-            if model_type == 'sklearn':
+            # Handle sklearn models (both old 'sklearn' and new specific types)
+            sklearn_types = {
+                'sklearn', 'adaboost', 'decision_tree', 'random_forest', 
+                'gradient_boosting', 'extra_trees', 'svm', 'logistic_regression',
+                'ridge', 'linear_svc', 'sgd', 'perceptron', 'passive_aggressive',
+                'naive_bayes', 'linear_discriminant', 'nearest_centroid',
+                'calibrated', 'xgboost', 'lightgbm', 'catboost'
+            }
+            
+            if model_type in sklearn_types:
                 model = model_data.get('model')
                 return model, model_type, feature_extractor
             else:
@@ -166,6 +175,13 @@ class ModelInterpretabilityAnalyzer:
                             if 'llm_transformation' in data and isinstance(data['llm_transformation'], dict):
                                 if 'rewritten_text' in data['llm_transformation']:
                                     text = data['llm_transformation']['rewritten_text'].strip()
+                            # Handle LLM-generated format in AI test file
+                            elif 'original_content' in data and isinstance(data['original_content'], dict):
+                                # Try different text fields from LLM-generated format
+                                for field in ['cleaned_text', 'content', 'raw_text']:
+                                    if field in data['original_content']:
+                                        text = data['original_content'][field].strip()
+                                        break
                             elif 'rewritten_text' in data:
                                 text = data['rewritten_text'].strip()
                             
@@ -198,26 +214,220 @@ class ModelInterpretabilityAnalyzer:
             return []
         
         try:
-            # Word-level TF-IDF features
-            if hasattr(feature_extractor, 'word_vectorizer') and feature_extractor.word_vectorizer:
-                word_features = [f"word_{word}" for word in feature_extractor.word_vectorizer.get_feature_names_out()]
-                feature_names.extend(word_features)
-                self.word_features = word_features
+            print(f"Extracting feature names from feature extractor...")
+            print(f"Feature extractor attributes: {[attr for attr in dir(feature_extractor) if not attr.startswith('_')]}")
             
-            # Character-level TF-IDF features  
-            if hasattr(feature_extractor, 'char_vectorizer') and feature_extractor.char_vectorizer:
-                char_features = [f"char_{char}" for char in feature_extractor.char_vectorizer.get_feature_names_out()]
-                feature_names.extend(char_features)
-                self.char_features = char_features
+            # Try different possible vectorizer attribute names
+            word_vectorizer = None
+            char_vectorizer = None
             
-            # Linguistic features (hand-crafted)
-            linguistic_names = [
-                'text_length', 'word_count', 'word_density', 'sentence_count', 'avg_words_per_sentence',
-                'upper_ratio', 'lower_ratio', 'digit_ratio', 'punct_ratio',
-                'lexical_diversity', 'avg_word_length', 'flesch_readability'
-            ]
+            # Check if there's an enhanced_extractor that contains the actual vectorizers
+            enhanced_extractor = None
+            if hasattr(feature_extractor, 'enhanced_extractor'):
+                enhanced_extractor = feature_extractor.enhanced_extractor
+                print(f"Found enhanced_extractor: {[attr for attr in dir(enhanced_extractor) if not attr.startswith('_')]}")
+            
+            # Check for vectorizers in the main extractor first, then in enhanced_extractor
+            extractors_to_check = [feature_extractor]
+            if enhanced_extractor is not None:
+                extractors_to_check.append(enhanced_extractor)
+            
+            for extractor in extractors_to_check:
+                # Check for various possible word vectorizer attribute names
+                for attr_name in ['word_vectorizer', 'word_tfidf', 'tfidf_word', 'vectorizer_word', 'word_vec', 'tfidf_vectorizer']:
+                    if hasattr(extractor, attr_name):
+                        word_vectorizer = getattr(extractor, attr_name)
+                        if word_vectorizer is not None:
+                            print(f"Found word vectorizer: {attr_name} in {type(extractor).__name__}")
+                            break
+                if word_vectorizer is not None:
+                    break
+            
+            for extractor in extractors_to_check:
+                # Check for various possible char vectorizer attribute names
+                for attr_name in ['char_vectorizer', 'char_tfidf', 'tfidf_char', 'vectorizer_char', 'char_vec', 'char_ngram_vectorizer']:
+                    if hasattr(extractor, attr_name):
+                        char_vectorizer = getattr(extractor, attr_name)
+                        if char_vectorizer is not None:
+                            print(f"Found char vectorizer: {attr_name} in {type(extractor).__name__}")
+                            break
+                if char_vectorizer is not None:
+                    break
+            
+            # First check if vocabularies are stored directly in the enhanced extractor
+            if enhanced_extractor and hasattr(enhanced_extractor, '_word_vocabulary'):
+                try:
+                    word_vocab_dict = enhanced_extractor._word_vocabulary
+                    if word_vocab_dict:
+                        # Sort by index to get ordered feature names
+                        word_vocab = [''] * len(word_vocab_dict)
+                        for word, idx in word_vocab_dict.items():
+                            if idx < len(word_vocab):
+                                word_vocab[idx] = word
+                        word_vocab = [w for w in word_vocab if w]
+                        word_features = [f"word_{word}" for word in word_vocab]
+                        feature_names.extend(word_features)
+                        self.word_features = word_features
+                        print(f"Extracted {len(word_features)} word features from stored vocabulary")
+                except Exception as e:
+                    print(f"Error accessing stored word vocabulary: {e}")
+            
+            elif word_vectorizer is not None:
+                try:
+                    # Try multiple methods to get vocabulary
+                    word_vocab = None
+                    if hasattr(word_vectorizer, 'get_feature_names_out'):
+                        try:
+                            word_vocab = word_vectorizer.get_feature_names_out()
+                        except Exception as e1:
+                            print(f"get_feature_names_out failed: {e1}")
+                    
+                    if word_vocab is None and hasattr(word_vectorizer, 'vocabulary_'):
+                        try:
+                            # Get vocabulary from vocabulary_ attribute
+                            vocab_dict = word_vectorizer.vocabulary_
+                            if vocab_dict:
+                                # Sort by index to get ordered feature names
+                                word_vocab = [None] * len(vocab_dict)
+                                for word, idx in vocab_dict.items():
+                                    if idx < len(word_vocab):
+                                        word_vocab[idx] = word
+                                # Remove any None values
+                                word_vocab = [w for w in word_vocab if w is not None]
+                        except Exception as e2:
+                            print(f"vocabulary_ access failed: {e2}")
+                    
+                    if word_vocab is not None and len(word_vocab) > 0:
+                        word_features = [f"word_{word}" for word in word_vocab]
+                        feature_names.extend(word_features)
+                        self.word_features = word_features
+                        print(f"Extracted {len(word_features)} word features")
+                    else:
+                        print("Could not extract word vocabulary")
+                        
+                except Exception as e:
+                    print(f"Warning: Could not get word features: {e}")
+            else:
+                print("No word vectorizer found")
+            
+            # First check if char vocabularies are stored directly in the enhanced extractor
+            if enhanced_extractor and hasattr(enhanced_extractor, '_char_vocabulary'):
+                try:
+                    char_vocab_dict = enhanced_extractor._char_vocabulary
+                    if char_vocab_dict:
+                        # Sort by index to get ordered feature names
+                        char_vocab = [''] * len(char_vocab_dict)
+                        for char, idx in char_vocab_dict.items():
+                            if idx < len(char_vocab):
+                                char_vocab[idx] = char
+                        char_vocab = [c for c in char_vocab if c]
+                        char_features = [f"char_{char}" for char in char_vocab]
+                        feature_names.extend(char_features)
+                        self.char_features = char_features
+                        print(f"Extracted {len(char_features)} character features from stored vocabulary")
+                except Exception as e:
+                    print(f"Error accessing stored char vocabulary: {e}")
+            
+            elif char_vectorizer is not None:
+                try:
+                    # Try multiple methods to get vocabulary
+                    char_vocab = None
+                    if hasattr(char_vectorizer, 'get_feature_names_out'):
+                        try:
+                            char_vocab = char_vectorizer.get_feature_names_out()
+                        except Exception as e1:
+                            print(f"get_feature_names_out failed: {e1}")
+                    
+                    if char_vocab is None and hasattr(char_vectorizer, 'vocabulary_'):
+                        try:
+                            # Get vocabulary from vocabulary_ attribute
+                            vocab_dict = char_vectorizer.vocabulary_
+                            if vocab_dict:
+                                # Sort by index to get ordered feature names
+                                char_vocab = [None] * len(vocab_dict)
+                                for char, idx in vocab_dict.items():
+                                    if idx < len(char_vocab):
+                                        char_vocab[idx] = char
+                                # Remove any None values
+                                char_vocab = [c for c in char_vocab if c is not None]
+                        except Exception as e2:
+                            print(f"vocabulary_ access failed: {e2}")
+                    
+                    if char_vocab is not None and len(char_vocab) > 0:
+                        char_features = [f"char_{char}" for char in char_vocab]
+                        feature_names.extend(char_features)
+                        self.char_features = char_features
+                        print(f"Extracted {len(char_features)} character features")
+                    else:
+                        print("Could not extract char vocabulary")
+                        
+                except Exception as e:
+                    print(f"Warning: Could not get char features: {e}")
+            else:
+                print("No char vectorizer found")
+            
+            # Get actual linguistic feature names from the enhanced extractor
+            linguistic_names = []
+            if enhanced_extractor and hasattr(enhanced_extractor, 'linguistic_extractor'):
+                try:
+                    ling_extractor = enhanced_extractor.linguistic_extractor
+                    if hasattr(ling_extractor, 'get_feature_names'):
+                        linguistic_names = ling_extractor.get_feature_names()
+                        print(f"Got {len(linguistic_names)} linguistic features from enhanced extractor")
+                    else:
+                        print("Linguistic extractor found but no get_feature_names method")
+                except Exception as e:
+                    print(f"Error getting linguistic features: {e}")
+            
+            # Fallback to hardcoded list if we couldn't get them from extractor
+            if not linguistic_names:
+                linguistic_names = [
+                    'text_length', 'word_count', 'word_density', 'sentence_count', 'avg_words_per_sentence',
+                    'upper_ratio', 'lower_ratio', 'digit_ratio', 'punct_ratio',
+                    'lexical_diversity', 'avg_word_length', 'flesch_readability'
+                ]
+                print(f"Using fallback linguistic features list: {len(linguistic_names)}")
+            
             self.linguistic_features = linguistic_names
             feature_names.extend(linguistic_names)
+            print(f"Added {len(linguistic_names)} linguistic features")
+            
+            print(f"Total feature names extracted: {len(feature_names)}")
+            
+            # If we have a mismatch between expected features and actual feature names,
+            # create placeholder names for the missing features
+            if hasattr(self, 'X_test') and self.X_test is not None:
+                expected_features = self.X_test.shape[1]
+            else:
+                # Try to get expected feature count from a test transform
+                if self.test_texts and len(self.test_texts) > 0:
+                    try:
+                        test_features = feature_extractor.transform(self.test_texts[:1])
+                        expected_features = test_features.shape[1]
+                    except:
+                        expected_features = len(feature_names)
+                else:
+                    expected_features = len(feature_names)
+            
+            if len(feature_names) < expected_features:
+                missing_count = expected_features - len(feature_names)
+                print(f"Creating {missing_count} placeholder feature names for missing TF-IDF features")
+                
+                # Add placeholder names for missing features
+                # Assume most missing features are word features (since that's typically the largest)
+                word_placeholders = [f"word_feature_{i}" for i in range(missing_count - 100)]  # Reserve 100 for char features
+                char_placeholders = [f"char_feature_{i}" for i in range(100)]  # Assume 100 char features
+                
+                feature_names.extend(word_placeholders)
+                feature_names.extend(char_placeholders)
+                
+                # Update the word and char features lists
+                if not self.word_features:  # If we couldn't get real word features
+                    self.word_features = word_placeholders
+                if not self.char_features:  # If we couldn't get real char features  
+                    self.char_features = char_placeholders
+                
+                print(f"Total feature names after placeholders: {len(feature_names)}")
             
         except Exception as e:
             print(f"Warning: Could not extract feature names: {e}")
@@ -284,45 +494,100 @@ class ModelInterpretabilityAnalyzer:
         
         try:
             # Get feature importances
-            if hasattr(model, 'feature_importances_'):
+            if hasattr(model, 'feature_importances_') and model.feature_importances_ is not None:
                 importances = model.feature_importances_
                 
-                # Create feature importance dataframe
+                # Check if importances is valid
+                if len(importances) == 0:
+                    print(f"  ⚠ {model_name}: Empty feature importances")
+                    results['interpretability'] = self._get_empty_tree_results()
+                    return results
+                
+                # Check if we have feature names
+                if len(self.feature_names) == 0:
+                    print(f"  ⚠ {model_name}: No feature names available")
+                    results['interpretability'] = self._get_empty_tree_results()
+                    return results
+                
+                # Create feature importance dataframe with extra safety
                 importance_data = []
                 for i, importance in enumerate(importances):
-                    if i < len(self.feature_names) and importance > 0:
-                        importance_data.append({
-                            'feature': self.feature_names[i],
-                            'importance': importance,
-                            'feature_type': self.get_feature_type(self.feature_names[i])
-                        })
+                    # Multiple safety checks - LOWERED THRESHOLD to include more features
+                    if (i < len(self.feature_names) and 
+                        importance is not None and 
+                        not np.isnan(importance) and 
+                        importance > 1e-8):  # Much lower threshold to include more features
+                        try:
+                            importance_data.append({
+                                'feature': str(self.feature_names[i]),
+                                'importance': float(importance),
+                                'feature_type': self.get_feature_type(self.feature_names[i])
+                            })
+                        except Exception as item_error:
+                            # Skip problematic items
+                            continue
                 
-                importance_df = pd.DataFrame(importance_data)
-                importance_df = importance_df.sort_values('importance', ascending=False)
+                # Handle empty dataframe case
+                if not importance_data:
+                    print(f"  ⚠ {model_name}: No valid features with importance > 0")
+                    results['interpretability'] = self._get_empty_tree_results()
+                else:
+                    try:
+                        # Create DataFrame with explicit error handling
+                        importance_df = pd.DataFrame(importance_data)
+                        
+                        # Verify DataFrame has required columns
+                        if 'importance' not in importance_df.columns:
+                            print(f"  ⚠ {model_name}: DataFrame missing importance column")
+                            results['interpretability'] = self._get_fallback_tree_results(importance_data)
+                            return results
+                        
+                        # Sort and filter safely
+                        importance_df = importance_df.sort_values('importance', ascending=False)
+                        
+                        # Filter by type safely
+                        word_features = importance_df[importance_df['feature_type'] == 'word'].head(20)
+                        linguistic_features = importance_df[importance_df['feature_type'] == 'linguistic']
+                        
+                        # Calculate stats safely
+                        importance_values = importance_df['importance'].values
+                        
+                        results['interpretability'] = {
+                            'top_features': importance_df.head(30).to_dict('records'),
+                            'top_word_features': word_features.to_dict('records'),
+                            'top_linguistic_features': linguistic_features.to_dict('records'),
+                            'importance_stats': {
+                                'mean_importance': float(np.mean(importance_values)),
+                                'max_importance': float(np.max(importance_values)),
+                                'num_nonzero_features': len(importance_df)
+                            }
+                        }
+                        
+                    except Exception as df_error:
+                        print(f"  ⚠ {model_name}: DataFrame processing error: {df_error}")
+                        results['interpretability'] = self._get_fallback_tree_results(importance_data)
                 
-                results['interpretability'] = {
-                    'top_features': importance_df.head(30).to_dict('records'),
-                    'top_word_features': importance_df[importance_df['feature_type'] == 'word'].head(20).to_dict('records'),
-                    'top_linguistic_features': importance_df[importance_df['feature_type'] == 'linguistic'].to_dict('records'),
-                    'importance_stats': {
-                        'mean_importance': importance_df['importance'].mean(),
-                        'max_importance': importance_df['importance'].max(),
-                        'num_nonzero_features': len(importance_df[importance_df['importance'] > 0])
-                    }
-                }
-                
-                # For single decision trees, also get tree structure info
+                # Add tree structure info for decision trees
                 if isinstance(model, DecisionTreeClassifier):
-                    results['interpretability']['tree_info'] = {
-                        'n_nodes': model.tree_.node_count,
-                        'n_leaves': model.tree_.n_leaves,
-                        'max_depth': model.tree_.max_depth
-                    }
+                    try:
+                        if hasattr(model, 'tree_') and model.tree_ is not None:
+                            results['interpretability']['tree_info'] = {
+                                'n_nodes': int(model.tree_.node_count),
+                                'n_leaves': int(model.tree_.n_leaves),
+                                'max_depth': int(model.tree_.max_depth)
+                            }
+                    except Exception as tree_error:
+                        print(f"  ⚠ {model_name}: Could not extract tree info: {tree_error}")
                 
                 print(f"  ✓ Analyzed {model_name}: {len(importances)} features, depth: {getattr(model, 'max_depth', 'N/A')}")
                 
+            else:
+                print(f"  ⚠ {model_name}: No feature_importances_ attribute or it's None")
+                results['interpretability'] = self._get_empty_tree_results()
+                
         except Exception as e:
-            print(f"  ✗ Failed to analyze {model_name}: {e}")
+            print(f"  ✗ Failed to analyze {model_name}: {str(e)}")
+            results['interpretability'] = self._get_empty_tree_results()
             
         return results
     
@@ -336,35 +601,92 @@ class ModelInterpretabilityAnalyzer:
         
         try:
             # Get feature importances (most ensemble methods have this)
-            if hasattr(model, 'feature_importances_'):
+            if hasattr(model, 'feature_importances_') and model.feature_importances_ is not None:
                 importances = model.feature_importances_
                 
+                # Check if importances is valid
+                if len(importances) == 0:
+                    print(f"  ⚠ {model_name}: Empty feature importances")
+                    results['interpretability'] = self._get_empty_ensemble_results(model)
+                    return results
+                
+                # Check if we have feature names
+                if len(self.feature_names) == 0:
+                    print(f"  ⚠ {model_name}: No feature names available")
+                    results['interpretability'] = self._get_empty_ensemble_results(model)
+                    return results
+                
+                # Create feature importance dataframe with extra safety
                 importance_data = []
                 for i, importance in enumerate(importances):
-                    if i < len(self.feature_names) and importance > 0:
-                        importance_data.append({
-                            'feature': self.feature_names[i],
-                            'importance': importance,
-                            'feature_type': self.get_feature_type(self.feature_names[i])
-                        })
+                    # Multiple safety checks - LOWERED THRESHOLD to include more features
+                    if (i < len(self.feature_names) and 
+                        importance is not None and 
+                        not np.isnan(importance) and 
+                        importance > 1e-8):  # Much lower threshold to include more features
+                        try:
+                            importance_data.append({
+                                'feature': str(self.feature_names[i]),
+                                'importance': float(importance),
+                                'feature_type': self.get_feature_type(self.feature_names[i])
+                            })
+                        except Exception as item_error:
+                            # Skip problematic items
+                            continue
                 
-                importance_df = pd.DataFrame(importance_data)
-                importance_df = importance_df.sort_values('importance', ascending=False)
-                
-                results['interpretability'] = {
-                    'top_features': importance_df.head(30).to_dict('records'),
-                    'top_word_features': importance_df[importance_df['feature_type'] == 'word'].head(20).to_dict('records'),
-                    'top_linguistic_features': importance_df[importance_df['feature_type'] == 'linguistic'].to_dict('records'),
-                    'ensemble_info': {
-                        'n_estimators': getattr(model, 'n_estimators', 'N/A'),
-                        'base_estimator': str(type(getattr(model, 'base_estimator', model)))
-                    }
-                }
+                # Handle empty dataframe case
+                if not importance_data:
+                    print(f"  ⚠ {model_name}: No valid features with importance > 0")
+                    results['interpretability'] = self._get_empty_ensemble_results(model)
+                else:
+                    try:
+                        # Create DataFrame with explicit error handling
+                        importance_df = pd.DataFrame(importance_data)
+                        
+                        # Verify DataFrame has required columns
+                        if 'importance' not in importance_df.columns:
+                            print(f"  ⚠ {model_name}: DataFrame missing importance column")
+                            results['interpretability'] = self._get_fallback_ensemble_results(importance_data, model)
+                            return results
+                        
+                        # Sort and filter safely
+                        importance_df = importance_df.sort_values('importance', ascending=False)
+                        
+                        # Filter by type safely
+                        word_features = importance_df[importance_df['feature_type'] == 'word'].head(20)
+                        linguistic_features = importance_df[importance_df['feature_type'] == 'linguistic']
+                        
+                        # Calculate stats safely
+                        importance_values = importance_df['importance'].values
+                        
+                        results['interpretability'] = {
+                            'top_features': importance_df.head(30).to_dict('records'),
+                            'top_word_features': word_features.to_dict('records'),
+                            'top_linguistic_features': linguistic_features.to_dict('records'),
+                            'importance_stats': {
+                                'mean_importance': float(np.mean(importance_values)),
+                                'max_importance': float(np.max(importance_values)),
+                                'num_nonzero_features': len(importance_df)
+                            },
+                            'ensemble_info': {
+                                'n_estimators': getattr(model, 'n_estimators', 'N/A'),
+                                'base_estimator': str(type(getattr(model, 'base_estimator', model)))
+                            }
+                        }
+                        
+                    except Exception as df_error:
+                        print(f"  ⚠ {model_name}: DataFrame processing error: {df_error}")
+                        results['interpretability'] = self._get_fallback_ensemble_results(importance_data, model)
                 
                 print(f"  ✓ Analyzed {model_name}: {getattr(model, 'n_estimators', 'N/A')} estimators")
                 
+            else:
+                print(f"  ⚠ {model_name}: No feature_importances_ attribute or it's None")
+                results['interpretability'] = self._get_empty_ensemble_results(model)
+                
         except Exception as e:
-            print(f"  ✗ Failed to analyze {model_name}: {e}")
+            print(f"  ✗ Failed to analyze {model_name}: {str(e)}")
+            results['interpretability'] = self._get_empty_ensemble_results(model)
             
         return results
     
@@ -378,6 +700,82 @@ class ModelInterpretabilityAnalyzer:
             return 'linguistic'
         else:
             return 'unknown'
+    
+    def _get_empty_tree_results(self) -> Dict[str, Any]:
+        """Get empty results structure for tree models."""
+        return {
+            'top_features': [],
+            'top_word_features': [],
+            'top_linguistic_features': [],
+            'importance_stats': {
+                'mean_importance': 0.0,
+                'max_importance': 0.0,
+                'num_nonzero_features': 0
+            }
+        }
+    
+    def _get_fallback_tree_results(self, importance_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Get fallback results structure for tree models when DataFrame fails."""
+        try:
+            word_features = [f for f in importance_data if f.get('feature_type') == 'word'][:20]
+            linguistic_features = [f for f in importance_data if f.get('feature_type') == 'linguistic']
+            importance_values = [f.get('importance', 0) for f in importance_data]
+            
+            return {
+                'top_features': importance_data[:30],
+                'top_word_features': word_features,
+                'top_linguistic_features': linguistic_features,
+                'importance_stats': {
+                    'mean_importance': float(np.mean(importance_values)) if importance_values else 0.0,
+                    'max_importance': float(max(importance_values)) if importance_values else 0.0,
+                    'num_nonzero_features': len(importance_data)
+                }
+            }
+        except Exception:
+            # Ultimate fallback
+            return self._get_empty_tree_results()
+    
+    def _get_empty_ensemble_results(self, model) -> Dict[str, Any]:
+        """Get empty results structure for ensemble models."""
+        return {
+            'top_features': [],
+            'top_word_features': [],
+            'top_linguistic_features': [],
+            'importance_stats': {
+                'mean_importance': 0.0,
+                'max_importance': 0.0,
+                'num_nonzero_features': 0
+            },
+            'ensemble_info': {
+                'n_estimators': getattr(model, 'n_estimators', 'N/A'),
+                'base_estimator': str(type(getattr(model, 'base_estimator', model)))
+            }
+        }
+    
+    def _get_fallback_ensemble_results(self, importance_data: List[Dict[str, Any]], model) -> Dict[str, Any]:
+        """Get fallback results structure for ensemble models when DataFrame fails."""
+        try:
+            word_features = [f for f in importance_data if f.get('feature_type') == 'word'][:20]
+            linguistic_features = [f for f in importance_data if f.get('feature_type') == 'linguistic']
+            importance_values = [f.get('importance', 0) for f in importance_data]
+            
+            return {
+                'top_features': importance_data[:30],
+                'top_word_features': word_features,
+                'top_linguistic_features': linguistic_features,
+                'importance_stats': {
+                    'mean_importance': float(np.mean(importance_values)) if importance_values else 0.0,
+                    'max_importance': float(max(importance_values)) if importance_values else 0.0,
+                    'num_nonzero_features': len(importance_data)
+                },
+                'ensemble_info': {
+                    'n_estimators': getattr(model, 'n_estimators', 'N/A'),
+                    'base_estimator': str(type(getattr(model, 'base_estimator', model)))
+                }
+            }
+        except Exception:
+            # Ultimate fallback
+            return self._get_empty_ensemble_results(model)
     
     def create_feature_importance_plots(self, interpretability_results: List[Dict]) -> None:
         """Create comprehensive feature importance visualizations."""

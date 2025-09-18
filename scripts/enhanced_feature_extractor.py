@@ -506,7 +506,7 @@ class EnhancedFeatureExtractor(BaseEstimator, TransformerMixin):
             stop_words='english',
             lowercase=True,
             strip_accents='unicode',
-            token_pattern=r'\b[a-zA-Z][a-zA-Z0-9]*\b',  # More restrictive pattern
+            token_pattern=r"(?u)\b\w+\b",  # Default pattern that handles contractions properly
             sublinear_tf=True  # Use log-scaled frequencies
         )
         feature_extractors.append(('word_tfidf', self.word_vectorizer))
@@ -622,10 +622,55 @@ class EnhancedFeatureExtractor(BaseEstimator, TransformerMixin):
         else:
             self.pipeline.fit(X)
         
+        # CRITICAL: Store vocabularies directly as attributes for interpretability
+        self._store_vocabularies()
+        
         # Print information about the feature extraction
         self._print_feature_info(X)
         
         return self
+    
+    def _store_vocabularies(self):
+        """Store vocabularies directly as attributes for interpretability."""
+        try:
+            # Access the vectorizers through the fitted pipeline
+            feature_union = self.pipeline.named_steps['features']
+            
+            # Get word vectorizer from the feature union
+            word_vectorizer = None
+            char_vectorizer = None
+            
+            if hasattr(feature_union, 'transformer_list'):
+                for name, transformer in feature_union.transformer_list:
+                    if name == 'word_tfidf':
+                        word_vectorizer = transformer
+                    elif name == 'char_tfidf':
+                        char_vectorizer = transformer
+            
+            # Store word vocabulary
+            if (word_vectorizer is not None and 
+                hasattr(word_vectorizer, 'vocabulary_') and 
+                word_vectorizer.vocabulary_):
+                self._word_vocabulary = dict(word_vectorizer.vocabulary_)
+                print(f"Stored word vocabulary with {len(self._word_vocabulary)} terms")
+            else:
+                self._word_vocabulary = {}
+                print("No word vocabulary to store")
+            
+            # Store character vocabulary
+            if (char_vectorizer is not None and 
+                hasattr(char_vectorizer, 'vocabulary_') and 
+                char_vectorizer.vocabulary_):
+                self._char_vocabulary = dict(char_vectorizer.vocabulary_)
+                print(f"Stored char vocabulary with {len(self._char_vocabulary)} terms")
+            else:
+                self._char_vocabulary = {}
+                print("No char vocabulary to store")
+                
+        except Exception as e:
+            print(f"Warning: Could not store vocabularies: {e}")
+            self._word_vocabulary = {}
+            self._char_vocabulary = {}
     
     def transform(self, X):
         """Transform texts using the fitted pipeline."""
@@ -671,14 +716,147 @@ class EnhancedFeatureExtractor(BaseEstimator, TransformerMixin):
             print(f"  {count}")
     
     def get_feature_names_out(self):
-        """Get feature names after transformation (if available)."""
+        """Get feature names after transformation, including actual words and char n-grams."""
         if self.pipeline is None:
             return []
         
-        # This is complex for pipelines with feature selection and dimensionality reduction
-        # For now, return generic names
-        final_features = self.transform([""]).shape[1]  # Empty string to get shape
-        return [f"feature_{i}" for i in range(final_features)]
+        try:
+            # Get feature names from the feature union (before selection/reduction)
+            feature_union = self.pipeline.named_steps['features']
+            all_feature_names = []
+            
+            # Get word features
+            if hasattr(self.word_vectorizer, 'get_feature_names_out'):
+                try:
+                    word_features = self.word_vectorizer.get_feature_names_out()
+                    word_feature_names = [f"word_{word}" for word in word_features]
+                    all_feature_names.extend(word_feature_names)
+                except:
+                    pass
+            elif hasattr(self.word_vectorizer, 'vocabulary_') and self.word_vectorizer.vocabulary_:
+                try:
+                    vocab = self.word_vectorizer.vocabulary_
+                    word_features = [''] * len(vocab)
+                    for word, idx in vocab.items():
+                        if idx < len(word_features):
+                            word_features[idx] = word
+                    word_feature_names = [f"word_{word}" for word in word_features if word]
+                    all_feature_names.extend(word_feature_names)
+                except:
+                    pass
+            
+            # Get character features
+            if hasattr(self.char_vectorizer, 'get_feature_names_out'):
+                try:
+                    char_features = self.char_vectorizer.get_feature_names_out()
+                    char_feature_names = [f"char_{char}" for char in char_features]
+                    all_feature_names.extend(char_feature_names)
+                except:
+                    pass
+            elif hasattr(self.char_vectorizer, 'vocabulary_') and self.char_vectorizer.vocabulary_:
+                try:
+                    vocab = self.char_vectorizer.vocabulary_
+                    char_features = [''] * len(vocab)
+                    for char, idx in vocab.items():
+                        if idx < len(char_features):
+                            char_features[idx] = char
+                    char_feature_names = [f"char_{char}" for char in char_features if char]
+                    all_feature_names.extend(char_feature_names)
+                except:
+                    pass
+            
+            # Get linguistic feature names
+            if hasattr(self.linguistic_extractor, 'get_feature_names'):
+                try:
+                    linguistic_names = self.linguistic_extractor.get_feature_names()
+                    all_feature_names.extend(linguistic_names)
+                except:
+                    pass
+            
+            # If we got feature names, handle feature selection and dimensionality reduction
+            if all_feature_names:
+                current_features = all_feature_names
+                
+                # Apply variance selection if present
+                if hasattr(self, 'variance_selector') and self.variance_selector is not None:
+                    try:
+                        if hasattr(self.variance_selector, 'get_support'):
+                            support_mask = self.variance_selector.get_support()
+                            current_features = [name for name, keep in zip(current_features, support_mask) if keep]
+                    except:
+                        pass
+                
+                # Apply feature selection if present
+                if hasattr(self, 'feature_selector') and self.feature_selector is not None:
+                    try:
+                        if hasattr(self.feature_selector, 'get_support'):
+                            support_mask = self.feature_selector.get_support()
+                            current_features = [name for name, keep in zip(current_features, support_mask) if keep]
+                    except:
+                        pass
+                
+                # If dimensionality reduction was applied, we lose individual feature names
+                if ('dimensionality_reduction' in self.pipeline.named_steps and 
+                    self.dimensionality_reducer is not None):
+                    n_components = len(current_features)
+                    if hasattr(self.dimensionality_reducer, 'n_components'):
+                        n_components = self.dimensionality_reducer.n_components
+                    current_features = [f"component_{i}" for i in range(n_components)]
+                
+                return current_features
+            
+            # Fallback to generic names
+            final_features = self.transform(["sample text"]).shape[1]
+            return [f"feature_{i}" for i in range(final_features)]
+            
+        except Exception as e:
+            print(f"Warning: Could not extract feature names: {e}")
+            # Final fallback
+            try:
+                final_features = self.transform(["sample text"]).shape[1]
+                return [f"feature_{i}" for i in range(final_features)]
+            except:
+                return []
+    
+    def get_word_feature_names(self):
+        """Get just the word feature names with their vocabularies."""
+        if self.word_vectorizer is None:
+            return []
+        
+        try:
+            if hasattr(self.word_vectorizer, 'get_feature_names_out'):
+                return list(self.word_vectorizer.get_feature_names_out())
+            elif hasattr(self.word_vectorizer, 'vocabulary_') and self.word_vectorizer.vocabulary_:
+                vocab = self.word_vectorizer.vocabulary_
+                word_features = [''] * len(vocab)
+                for word, idx in vocab.items():
+                    if idx < len(word_features):
+                        word_features[idx] = word
+                return [word for word in word_features if word]
+        except Exception as e:
+            print(f"Warning: Could not extract word features: {e}")
+        
+        return []
+    
+    def get_char_feature_names(self):
+        """Get just the character n-gram feature names with their vocabularies."""
+        if self.char_vectorizer is None:
+            return []
+        
+        try:
+            if hasattr(self.char_vectorizer, 'get_feature_names_out'):
+                return list(self.char_vectorizer.get_feature_names_out())
+            elif hasattr(self.char_vectorizer, 'vocabulary_') and self.char_vectorizer.vocabulary_:
+                vocab = self.char_vectorizer.vocabulary_
+                char_features = [''] * len(vocab)
+                for char, idx in vocab.items():
+                    if idx < len(char_features):
+                        char_features[idx] = char
+                return [char for char in char_features if char]
+        except Exception as e:
+            print(f"Warning: Could not extract char features: {e}")
+        
+        return []
 
 
 def create_enhanced_feature_extractor(config: str = 'default') -> EnhancedFeatureExtractor:
