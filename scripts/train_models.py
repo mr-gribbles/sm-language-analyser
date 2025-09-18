@@ -1078,19 +1078,30 @@ class ComprehensiveModelTrainer:
                 
                 # Handle special cases for models that need non-negative features
                 if isinstance(model, (MultinomialNB, ComplementNB)):
-                    # Use only word features (TF-IDF) which are non-negative
-                    word_features = X_train[:, :self.feature_extractor.max_features//2]
-                    model.fit(word_features, y_train)
+                    # These models require non-negative features
+                    # Apply Min-Max scaling to ensure all features are non-negative
+                    from sklearn.preprocessing import MinMaxScaler
+                    scaler = MinMaxScaler()
+                    X_train_non_neg = scaler.fit_transform(X_train)
+                    model.fit(X_train_non_neg, y_train)
+                    # Store the scaler for later use in evaluation
+                    model._feature_scaler = scaler
                 else:
                     model.fit(X_train, y_train)
                 
                 # Cross-validation
-                cv_results = self.cross_validate_model(model, X_train, y_train, model_name)
+                if isinstance(model, (MultinomialNB, ComplementNB)) and hasattr(model, '_feature_scaler'):
+                    # Use scaled features for cross-validation
+                    X_train_scaled_cv = model._feature_scaler.transform(X_train)
+                    cv_results = self.cross_validate_model(model, X_train_scaled_cv, y_train, model_name)
+                else:
+                    cv_results = self.cross_validate_model(model, X_train, y_train, model_name)
                 
                 # Test evaluation
-                if isinstance(model, (MultinomialNB, ComplementNB)):
-                    word_features_test = X_test[:, :self.feature_extractor.max_features//2]
-                    test_results = self.evaluate_model(model, word_features_test, y_test, model_name)
+                if isinstance(model, (MultinomialNB, ComplementNB)) and hasattr(model, '_feature_scaler'):
+                    # Apply the same scaling transformation used during training
+                    X_test_non_neg = model._feature_scaler.transform(X_test)
+                    test_results = self.evaluate_model(model, X_test_non_neg, y_test, model_name)
                 else:
                     test_results = self.evaluate_model(model, X_test, y_test, model_name)
                 

@@ -231,16 +231,24 @@ class ModelPredictor:
         try:
             # Extract features using the model's feature extractor
             feature_extractor = model_data['feature_extractor']
-            features = feature_extractor.transform([text])
+            
+            # Check if we have an enhanced feature extractor
+            if hasattr(feature_extractor, 'enhanced_extractor') and feature_extractor.enhanced_extractor:
+                # Use the enhanced feature extractor
+                features = feature_extractor.enhanced_extractor.transform([text])
+            elif hasattr(feature_extractor, 'transform'):
+                # Use regular feature extractor
+                features = feature_extractor.transform([text])
+            else:
+                raise ValueError("Feature extractor doesn't have transform method")
             
             model_type = model_data['model_type']
             
             if model_type == 'neural_network':
                 return self._predict_neural_network(model_data, features, model_name)
-            elif model_type == 'sklearn':
-                return self._predict_sklearn_model(model_data, features, text)
             else:
-                raise ValueError(f"Unknown model type: {model_type}")
+                # Handle all sklearn-compatible model types
+                return self._predict_sklearn_model(model_data, features, text)
                 
         except Exception as e:
             print(f"Prediction failed: {e}")

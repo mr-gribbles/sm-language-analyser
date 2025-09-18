@@ -103,8 +103,9 @@ class NewModelEvaluator:
                 'sklearn', 'adaboost', 'decision_tree', 'random_forest', 
                 'gradient_boosting', 'extra_trees', 'svm', 'logistic_regression',
                 'ridge', 'linear_svc', 'sgd', 'perceptron', 'passive_aggressive',
-                'naive_bayes', 'linear_discriminant', 'nearest_centroid',
-                'calibrated', 'xgboost', 'lightgbm', 'catboost'
+                'naive_bayes', 'discriminant_analysis', 'nearest_centroid',
+                'calibrated', 'xgboost', 'lightgbm', 'catboost',
+                'bagging', 'knn', 'mlp', 'voting', 'stacking'
             }
             
             if model_type in sklearn_types:
@@ -116,30 +117,49 @@ class NewModelEvaluator:
                 
                 return model, model_type, feature_extractor
                 
-            elif model_type == 'neural_network':
+            elif model_type == 'neural_network' or model_type == 'neural_network_ensemble':
                 # PyTorch model - load actual trained model
                 print(f"Loading neural network {model_path.name}")
                 
                 try:
-                    # Get model architecture and state dict
-                    model_state_dict = model_data.get('model_state_dict')
-                    input_dim = model_data.get('input_dim', 7512)
-                    
-                    if model_state_dict is None:
-                        print(f"Warning: No model_state_dict found in {model_path.name}")
-                        return None, model_type, feature_extractor
+                    # Handle ensemble models specially
+                    if model_type == 'neural_network_ensemble':
+                        print(f"Loading ensemble with {model_data.get('ensemble_size', 0)} models")
+                        # For now, just use the first model in the ensemble
+                        model_states = model_data.get('model_states', [])
+                        if not model_states:
+                            print(f"Warning: No model_states found in ensemble {model_path.name}")
+                            return None, model_type, feature_extractor
+                        model_state_dict = model_states[0]  # Use first model
+                        input_dim = model_data.get('input_dim', 7512)
+                    else:
+                        # Regular neural network
+                        model_state_dict = model_data.get('model_state_dict')
+                        input_dim = model_data.get('input_dim', 7512)
+                        
+                        if model_state_dict is None:
+                            print(f"Warning: No model_state_dict found in {model_path.name}")
+                            return None, model_type, feature_extractor
                     
                     # Detect architecture from state dict
                     def detect_architecture_from_state_dict(state_dict):
                         """Detect neural network architecture from state dict keys"""
                         keys = list(state_dict.keys())
                         
+                        # Check for wide_deep_hybrid architecture
+                        if any(key.startswith('wide_path.') for key in keys):
+                            # Wide-deep hybrid model - create simplified architecture
+                            return [1024, 512, 256, 128], 0  # Simplified representation
+                        
                         # Find the highest numbered layer to determine depth
                         layer_numbers = []
                         for key in keys:
                             if key.startswith('network.') and '.' in key[8:]:
-                                layer_num = int(key.split('.')[1])
-                                layer_numbers.append(layer_num)
+                                try:
+                                    layer_num = int(key.split('.')[1])
+                                    layer_numbers.append(layer_num)
+                                except (ValueError, IndexError):
+                                    continue
                         
                         max_layer = max(layer_numbers) if layer_numbers else 0
                         
@@ -709,11 +729,17 @@ class NewModelEvaluator:
         ax3.set_xlabel('Model Type')
         ax3.set_ylabel('Average Accuracy')
         ax3.set_title('Performance by Model Type')
+        
+        # Fix overlapping labels by rotating them
+        ax3.tick_params(axis='x', rotation=45, labelsize=8)
         ax3.grid(True, alpha=0.3)
+        
+        # Adjust layout to prevent label cutoff
+        plt.setp(ax3.get_xticklabels(), ha='right')
         
         # 4. Accuracy distribution
         ax4 = axes[1, 0]
-        ax4.hist(df['accuracy'], bins=20, alpha=0.7, edgecolor='black')
+        ax4.hist(df['accuracy'], bins=10, alpha=0.7, edgecolor='black')
         ax4.set_xlabel('Accuracy')
         ax4.set_ylabel('Number of Models')
         ax4.set_title('Accuracy Distribution')

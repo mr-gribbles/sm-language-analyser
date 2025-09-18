@@ -103,8 +103,9 @@ class ComprehensiveModelEvaluator:
                 'sklearn', 'adaboost', 'decision_tree', 'random_forest', 
                 'gradient_boosting', 'extra_trees', 'svm', 'logistic_regression',
                 'ridge', 'linear_svc', 'sgd', 'perceptron', 'passive_aggressive',
-                'naive_bayes', 'linear_discriminant', 'nearest_centroid',
-                'calibrated', 'xgboost', 'lightgbm', 'catboost'
+                'naive_bayes', 'discriminant_analysis', 'nearest_centroid',
+                'calibrated', 'xgboost', 'lightgbm', 'catboost',
+                'bagging', 'knn', 'mlp', 'voting', 'stacking'
             }
             
             if model_type in sklearn_types:

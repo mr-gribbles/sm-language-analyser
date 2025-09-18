@@ -117,8 +117,9 @@ class ModelInterpretabilityAnalyzer:
                 'sklearn', 'adaboost', 'decision_tree', 'random_forest', 
                 'gradient_boosting', 'extra_trees', 'svm', 'logistic_regression',
                 'ridge', 'linear_svc', 'sgd', 'perceptron', 'passive_aggressive',
-                'naive_bayes', 'linear_discriminant', 'nearest_centroid',
-                'calibrated', 'xgboost', 'lightgbm', 'catboost'
+                'naive_bayes', 'discriminant_analysis', 'nearest_centroid',
+                'calibrated', 'xgboost', 'lightgbm', 'catboost',
+                'bagging', 'knn', 'mlp', 'voting', 'stacking'
             }
             
             if model_type in sklearn_types:
@@ -778,8 +779,8 @@ class ModelInterpretabilityAnalyzer:
             return self._get_empty_ensemble_results(model)
     
     def create_feature_importance_plots(self, interpretability_results: List[Dict]) -> None:
-        """Create comprehensive feature importance visualizations."""
-        print("Creating feature importance visualizations...")
+        """Create separate PNG files for each visualization type."""
+        print("Creating individual interpretability visualizations...")
         
         # Filter out models without interpretability data
         valid_results = [r for r in interpretability_results if r['interpretability']]
@@ -788,108 +789,207 @@ class ModelInterpretabilityAnalyzer:
             print("No interpretable models found for plotting")
             return
         
-        # Create comprehensive figure
-        fig = plt.figure(figsize=(20, 16))
-        
-        # 1. Top word features across models (subplot 1)
-        plt.subplot(3, 2, 1)
+        # 1. Top word features across models - SEPARATE PNG
+        print("  Creating word features plot...")
+        plt.figure(figsize=(12, 8))
         self.plot_top_word_features(valid_results)
-        
-        # 2. Linguistic features comparison (subplot 2)
-        plt.subplot(3, 2, 2)
-        self.plot_linguistic_features(valid_results)
-        
-        # 3. Model comparison heatmap (subplot 3)
-        plt.subplot(3, 2, 3)
-        self.plot_model_comparison_heatmap(valid_results)
-        
-        # 4. Feature type distribution (subplot 4)
-        plt.subplot(3, 2, 4)
-        self.plot_feature_type_distribution(valid_results)
-        
-        # 5. Coefficient comparison for linear models (subplot 5)
-        plt.subplot(3, 2, 5)
-        self.plot_coefficient_comparison(valid_results)
-        
-        # 6. Top features word cloud (subplot 6)
-        plt.subplot(3, 2, 6)
-        self.create_importance_wordcloud(valid_results)
-        
-        plt.tight_layout()
-        plot_file = self.output_dir / 'comprehensive_interpretability_analysis.png'
-        plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-        print(f"Comprehensive interpretability plots saved to {plot_file}")
+        plot_file = self.output_dir / 'word_features_analysis.png'
+        plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
+        print(f"    Saved to {plot_file}")
+        
+        # 2. Model comparison heatmap - SEPARATE PNG 
+        print("  Creating model comparison plot...")
+        plt.figure(figsize=(14, 8))
+        self.plot_model_comparison_heatmap(valid_results)
+        plot_file = self.output_dir / 'model_comparison_heatmap.png'
+        plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        print(f"    Saved to {plot_file}")
+        
+        # 3. Feature type distribution - SEPARATE PNG
+        print("  Creating feature distribution plot...")
+        plt.figure(figsize=(8, 8))
+        self.plot_feature_type_distribution(valid_results)
+        plot_file = self.output_dir / 'feature_type_distribution.png'
+        plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        print(f"    Saved to {plot_file}")
+        
+        # 4. Coefficient comparison for linear models - SEPARATE PNG
+        print("  Creating coefficient comparison plot...")
+        plt.figure(figsize=(16, 10))
+        self.plot_coefficient_comparison(valid_results)
+        plot_file = self.output_dir / 'coefficient_comparison.png'
+        plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        print(f"    Saved to {plot_file}")
+        
+        # 5. Top features word cloud - SEPARATE PNG
+        print("  Creating word cloud...")
+        plt.figure(figsize=(10, 8))
+        self.create_importance_wordcloud(valid_results)
+        plot_file = self.output_dir / 'important_words_wordcloud.png'
+        plt.savefig(plot_file, dpi=300, bbox_inches='tight', facecolor='white')
+        plt.close()
+        print(f"    Saved to {plot_file}")
+        
+        print("All individual plots created successfully!")
     
     def plot_top_word_features(self, results: List[Dict]) -> None:
-        """Plot top word features across models."""
+        """Plot top word features across models with improved scaling and filtering."""
         word_importance_data = []
         
         for result in results:
             interp = result['interpretability']
             model_name = result['model_name']
+            model_type = result['model_type']
             
             # Get word features based on model type
             if 'top_word_features' in interp:
-                features = interp['top_word_features'][:10]
+                features = interp['top_word_features'][:15]  # Get more features to choose from
                 for feature in features:
                     word = feature['feature'].replace('word_', '')
-                    importance = feature.get('importance', feature.get('abs_coefficient', 0))
-                    word_importance_data.append({
-                        'word': word,
-                        'importance': importance,
-                        'model': model_name
-                    })
+                    
+                    # Handle different scales for different model types with better scaling
+                    if model_type == 'linear':
+                        raw_value = abs(feature.get('coefficient', feature.get('abs_coefficient', 0)))
+                        # Improved scaling for better visibility
+                        if raw_value > 0.001:  # Filter out very small coefficients
+                            importance = min(raw_value * 50, 1.0)  # Better scaling factor
+                        else:
+                            importance = 0
+                    else:
+                        importance = feature.get('importance', 0)
+                    
+                    # Only include features with meaningful values
+                    if importance > 0.001:  # Filter threshold
+                        word_importance_data.append({
+                            'word': word,
+                            'importance': importance,
+                            'model': model_name,
+                            'model_type': model_type
+                        })
         
         if word_importance_data:
             df = pd.DataFrame(word_importance_data)
-            # Get top words across all models
-            top_words = df.groupby('word')['importance'].mean().nlargest(15).index
+            
+            # Filter out words that appear in very few models or have low importance
+            word_stats = df.groupby('word')['importance'].agg(['mean', 'count'])
+            significant_words = word_stats[
+                (word_stats['mean'] > 0.01) |  # High importance
+                (word_stats['count'] >= 2)     # Appears in multiple models
+            ].index
+            
+            # Get top words for display
+            top_words = word_stats.loc[significant_words]['mean'].nlargest(12).index
             df_filtered = df[df['word'].isin(top_words)]
             
-            # Create pivot for heatmap
-            pivot_df = df_filtered.pivot_table(index='word', columns='model', values='importance', fill_value=0)
+            if not df_filtered.empty:
+                # Create pivot for heatmap
+                pivot_df = df_filtered.pivot_table(index='word', columns='model', values='importance', fill_value=0)
+                
+                # Remove rows and columns that are mostly zeros
+                pivot_df = pivot_df.loc[(pivot_df > 0.001).any(axis=1)]  # Remove zero rows
+                pivot_df = pivot_df.loc[:, (pivot_df > 0.001).any(axis=0)]  # Remove zero columns
+                
+                if not pivot_df.empty:
+                    # Normalize each column for fair comparison
+                    pivot_df_norm = pivot_df.div(pivot_df.max(axis=0), axis=1).fillna(0)
+                    
+                    # Create heatmap with better formatting
+                    ax = sns.heatmap(pivot_df_norm, annot=False, cmap='viridis', 
+                                   cbar_kws={'label': 'Normalized Importance'},
+                                   fmt='.3f', square=False)
+                    
+                    plt.title('Top Word Features Across Models', fontsize=12, fontweight='bold')
+                    plt.ylabel('Words', fontsize=10)
+                    plt.xlabel('Models', fontsize=10)
+                    plt.xticks(rotation=45, ha='right', fontsize=8)
+                    plt.yticks(rotation=0, fontsize=8)
+                    
+                    return
             
-            sns.heatmap(pivot_df, annot=False, cmap='viridis', cbar_kws={'label': 'Importance'})
-            plt.title('Top Word Features Across Models')
-            plt.ylabel('Words')
-            plt.xticks(rotation=45)
-        else:
-            plt.text(0.5, 0.5, 'No word features found', ha='center', va='center', transform=plt.gca().transAxes)
-            plt.title('Top Word Features (No Data)')
+        # Fallback if no data
+        plt.text(0.5, 0.5, 'No significant word features found', ha='center', va='center', 
+                transform=plt.gca().transAxes, fontsize=12)
+        plt.title('Top Word Features (No Data)', fontsize=12)
     
     def plot_linguistic_features(self, results: List[Dict]) -> None:
-        """Plot linguistic features comparison."""
+        """Plot linguistic features comparison with improved scaling and filtering."""
         linguistic_data = []
         
         for result in results:
             interp = result['interpretability']
             model_name = result['model_name']
+            model_type = result['model_type']
             
             if 'top_linguistic_features' in interp:
                 features = interp['top_linguistic_features']
                 for feature in features:
-                    importance = feature.get('importance', feature.get('abs_coefficient', 0))
-                    linguistic_data.append({
-                        'feature': feature['feature'],
-                        'importance': importance,
-                        'model': model_name
-                    })
+                    # Handle different scales for different model types with better scaling
+                    if model_type == 'linear':
+                        raw_value = abs(feature.get('coefficient', feature.get('abs_coefficient', 0)))
+                        # Improved scaling for better visibility
+                        if raw_value > 0.001:  # Filter out very small coefficients
+                            importance = min(raw_value * 50, 1.0)  # Better scaling factor
+                        else:
+                            importance = 0
+                    else:
+                        importance = feature.get('importance', 0)
+                    
+                    # Only include features with meaningful values
+                    if importance > 0.001:  # Filter threshold
+                        linguistic_data.append({
+                            'feature': feature['feature'],
+                            'importance': importance,
+                            'model': model_name,
+                            'model_type': model_type
+                        })
         
         if linguistic_data:
             df = pd.DataFrame(linguistic_data)
-            pivot_df = df.pivot_table(index='feature', columns='model', values='importance', fill_value=0)
             
-            sns.heatmap(pivot_df, annot=True, fmt='.3f', cmap='RdBu_r', center=0)
-            plt.title('Linguistic Features Importance')
-            plt.ylabel('Linguistic Features')
-            plt.xticks(rotation=45)
-        else:
-            plt.text(0.5, 0.5, 'No linguistic features found', ha='center', va='center', transform=plt.gca().transAxes)
-            plt.title('Linguistic Features (No Data)')
+            # Filter out features that appear in very few models or have low importance
+            feature_stats = df.groupby('feature')['importance'].agg(['mean', 'count'])
+            significant_features = feature_stats[
+                (feature_stats['mean'] > 0.01) |  # High importance
+                (feature_stats['count'] >= 2)     # Appears in multiple models
+            ].index
+            
+            df_filtered = df[df['feature'].isin(significant_features)]
+            
+            if not df_filtered.empty:
+                # Create pivot for heatmap
+                pivot_df = df_filtered.pivot_table(index='feature', columns='model', values='importance', fill_value=0)
+                
+                # Remove rows and columns that are mostly zeros
+                pivot_df = pivot_df.loc[(pivot_df > 0.001).any(axis=1)]  # Remove zero rows
+                pivot_df = pivot_df.loc[:, (pivot_df > 0.001).any(axis=0)]  # Remove zero columns
+                
+                if not pivot_df.empty:
+                    # Normalize each column to prevent linear models from dominating
+                    pivot_df_norm = pivot_df.div(pivot_df.max(axis=0), axis=1).fillna(0)
+                    
+                    # Create heatmap with better formatting
+                    ax = sns.heatmap(pivot_df_norm, annot=True, fmt='.3f', cmap='RdBu_r', center=0.5,
+                                   cbar_kws={'label': 'Normalized Importance'}, square=False)
+                    
+                    plt.title('Linguistic Features Importance', fontsize=12, fontweight='bold')
+                    plt.ylabel('Features', fontsize=10)
+                    plt.xlabel('Models', fontsize=10)
+                    plt.xticks(rotation=45, ha='right', fontsize=8)
+                    plt.yticks(rotation=0, fontsize=8)
+                    
+                    return
+            
+        # Fallback if no data
+        plt.text(0.5, 0.5, 'No significant linguistic features found', ha='center', va='center', 
+                transform=plt.gca().transAxes, fontsize=12)
+        plt.title('Linguistic Features (No Data)', fontsize=12)
     
     def plot_model_comparison_heatmap(self, results: List[Dict]) -> None:
-        """Create model comparison heatmap."""
+        """Create model comparison heatmap with proper scaling."""
         model_stats = []
         
         for result in results:
@@ -903,8 +1003,9 @@ class ModelInterpretabilityAnalyzer:
                 stats.update(interp['importance_stats'])
             elif 'coefficient_stats' in interp:
                 coef_stats = interp['coefficient_stats']
-                stats['mean_importance'] = coef_stats.get('mean_abs_coef', 0)
-                stats['max_importance'] = coef_stats.get('max_abs_coef', 0)
+                # Scale coefficient stats to be comparable with importance stats
+                stats['mean_importance'] = min(coef_stats.get('mean_abs_coef', 0) * 10, 1.0)
+                stats['max_importance'] = min(coef_stats.get('max_abs_coef', 0) * 10, 1.0)
                 stats['num_nonzero_features'] = coef_stats.get('num_positive', 0) + coef_stats.get('num_negative', 0)
             
             model_stats.append(stats)
@@ -915,9 +1016,12 @@ class ModelInterpretabilityAnalyzer:
             if len(numeric_cols) > 0:
                 df_numeric = df[numeric_cols].fillna(0)
                 
-                sns.heatmap(df_numeric.T, annot=True, fmt='.3f', cmap='viridis', 
-                           xticklabels=df['model'], cbar_kws={'label': 'Value'})
-                plt.title('Model Statistics Comparison')
+                # Normalize columns to 0-1 range for fair comparison
+                df_normalized = df_numeric.div(df_numeric.max(axis=0), axis=1).fillna(0)
+                
+                sns.heatmap(df_normalized.T, annot=True, fmt='.3f', cmap='viridis', 
+                           xticklabels=df['model'], cbar_kws={'label': 'Normalized Value'})
+                plt.title('Model Statistics Comparison (Normalized)')
                 plt.xlabel('Models')
                 plt.xticks(rotation=45)
         else:
@@ -947,7 +1051,7 @@ class ModelInterpretabilityAnalyzer:
             plt.title('Feature Type Distribution (No Data)')
     
     def plot_coefficient_comparison(self, results: List[Dict]) -> None:
-        """Plot coefficient comparison for linear models."""
+        """Plot coefficient comparison for linear models with improved filtering."""
         linear_results = [r for r in results if r['model_type'] == 'linear']
         
         if linear_results:
@@ -957,41 +1061,82 @@ class ModelInterpretabilityAnalyzer:
                 model_name = result['model_name']
                 interp = result['interpretability']
                 
+                # Get significant positive features only
                 if 'top_positive_features' in interp:
-                    for feature in interp['top_positive_features'][:5]:
-                        coef_data.append({
-                            'model': model_name,
-                            'feature': feature['feature'].replace('word_', ''),
-                            'coefficient': feature['coefficient'],
-                            'type': 'positive'
-                        })
+                    for feature in interp['top_positive_features']:
+                        coef_value = feature['coefficient']
+                        # Only include coefficients with meaningful magnitude
+                        if abs(coef_value) > 0.01:  # Much stricter threshold
+                            coef_data.append({
+                                'model': model_name,
+                                'feature': feature['feature'].replace('word_', ''),
+                                'coefficient': coef_value,
+                                'type': 'positive'
+                            })
+                        # Stop after getting enough significant features
+                        if len([d for d in coef_data if d['model'] == model_name and d['type'] == 'positive']) >= 8:
+                            break
                 
+                # Get significant negative features only
                 if 'top_negative_features' in interp:
-                    for feature in interp['top_negative_features'][:5]:
-                        coef_data.append({
-                            'model': model_name,
-                            'feature': feature['feature'].replace('word_', ''),
-                            'coefficient': feature['coefficient'],
-                            'type': 'negative'
-                        })
+                    for feature in interp['top_negative_features']:
+                        coef_value = feature['coefficient']
+                        # Only include coefficients with meaningful magnitude
+                        if abs(coef_value) > 0.01:  # Much stricter threshold
+                            coef_data.append({
+                                'model': model_name,
+                                'feature': feature['feature'].replace('word_', ''),
+                                'coefficient': coef_value,
+                                'type': 'negative'
+                            })
+                        # Stop after getting enough significant features
+                        if len([d for d in coef_data if d['model'] == model_name and d['type'] == 'negative']) >= 8:
+                            break
             
             if coef_data:
                 df = pd.DataFrame(coef_data)
                 
-                # Create grouped bar plot
-                pivot_df = df.pivot_table(index='feature', columns='model', values='coefficient', fill_value=0)
-                pivot_df.plot(kind='bar', width=0.8)
-                plt.title('Feature Coefficients Across Linear Models')
-                plt.xlabel('Features')
-                plt.ylabel('Coefficient Value')
-                plt.xticks(rotation=45)
-                plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+                # Filter out features that appear in very few models
+                feature_counts = df['feature'].value_counts()
+                significant_features = feature_counts[feature_counts >= 2].index  # Must appear in at least 2 models
+                df_filtered = df[df['feature'].isin(significant_features)]
+                
+                if not df_filtered.empty:
+                    # Take only top features by absolute coefficient value
+                    df_top = df_filtered.nlargest(40, 'coefficient', keep='all').nsmallest(40, 'coefficient', keep='all')
+                    
+                    # Create pivot for plotting
+                    pivot_df = df_top.pivot_table(index='feature', columns='model', values='coefficient', fill_value=0)
+                    
+                    # Remove any remaining near-zero rows
+                    pivot_df = pivot_df.loc[abs(pivot_df).max(axis=1) > 0.01]
+                    
+                    if not pivot_df.empty:
+                        # Create improved plot
+                        ax = pivot_df.plot(kind='bar', figsize=(14, 8), width=0.8)
+                        plt.title('Feature Coefficients Across Linear Models (Filtered)', fontsize=14, fontweight='bold')
+                        plt.xlabel('Features', fontsize=12)
+                        plt.ylabel('Coefficient Value', fontsize=12)
+                        plt.xticks(rotation=45, ha='right', fontsize=10)
+                        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=10)
+                        plt.grid(axis='y', alpha=0.3)
+                        plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+                        
+                        return
+                
+                # Fallback if filtering removes everything
+                plt.text(0.5, 0.5, 'No significant coefficients found\n(threshold: |coef| > 0.01)', 
+                        ha='center', va='center', transform=plt.gca().transAxes, fontsize=12)
+                plt.title('Coefficient Comparison (All Values Too Small)', fontsize=12)
+                
             else:
-                plt.text(0.5, 0.5, 'No coefficient data available', ha='center', va='center', transform=plt.gca().transAxes)
-                plt.title('Coefficient Comparison (No Data)')
+                plt.text(0.5, 0.5, 'No coefficient data available', ha='center', va='center', 
+                        transform=plt.gca().transAxes, fontsize=12)
+                plt.title('Coefficient Comparison (No Data)', fontsize=12)
         else:
-            plt.text(0.5, 0.5, 'No linear models found', ha='center', va='center', transform=plt.gca().transAxes)
-            plt.title('Linear Model Coefficients (No Models)')
+            plt.text(0.5, 0.5, 'No linear models found', ha='center', va='center', 
+                    transform=plt.gca().transAxes, fontsize=12)
+            plt.title('Linear Model Coefficients (No Models)', fontsize=12)
     
     def create_importance_wordcloud(self, results: List[Dict]) -> None:
         """Create word cloud of most important features."""
@@ -1362,8 +1507,13 @@ class ModelInterpretabilityAnalyzer:
         print("\n" + "=" * 80)
         print("INTERPRETABILITY ANALYSIS COMPLETE!")
         print(f"Results saved to: {self.output_dir}/")
-        print("Files generated:")
-        print("  • comprehensive_interpretability_analysis.png")
+        print("Individual visualization files generated:")
+        print("  • word_features_analysis.png")
+        print("  • model_comparison_heatmap.png") 
+        print("  • feature_type_distribution.png")
+        print("  • coefficient_comparison.png")
+        print("  • important_words_wordcloud.png")
+        print("Analysis files:")
         print("  • model_interpretability_report.md")
         print("  • detailed_interpretability_results.json")
         if self.test_texts:

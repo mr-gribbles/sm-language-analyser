@@ -138,6 +138,8 @@ corpora/
 # Data files
 models/
 plots/
+results/
+plots_small/
 evaluation_results/
 interpretability_results/ 
 test_file/
