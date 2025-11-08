@@ -85,22 +85,35 @@ If you have multiple `.jsonl` files, you can merge them into a single file for e
     python scripts/combine_corpora.py corpora/original_only --delete-originals
     ```
 
-### Step 6: Advanced Analysis
+### Step 6: Model Training and Evaluation
 
-The `conc_analysis.py` script performs a keyness analysis to compare the original and rewritten corpora. The required spaCy model (`en_core_web_sm`) will be downloaded automatically the first time you run the script.
+This project includes scripts for training, evaluating, and interpreting models.
 
-*   **Run the advanced analysis:**
+*   **Train Models:**
     ```bash
-    python scripts/conc_analysis.py corpora/original_only/your_file.jsonl corpora/rewritten_pairs/your_rewritten_file.jsonl
+    python train_models.py --human-file human.jsonl --ai-file ai.jsonl
+    ```
+*   **Evaluate Models:**
+    ```bash
+    python scripts/evaluate_models.py
+    ```
+*   **Interpret Models:**
+    ```bash
+    python scripts/interpret_models.py
     ```
 
-## Running Tests
+### Step 7: Prediction
 
-This project uses `pytest` for unit testing. To run the tests, simply run the following command from the root directory:
+You can use the trained models to predict whether a given text was written by a human or an AI.
 
-```bash
-pytest
-```
+*   **Predict a single text:**
+    ```bash
+    python scripts/predict_text.py "This is a sample text."
+    ```
+*   **Predict a text from a file:**
+    ```bash
+    python scripts/predict_text.py --file path/to/your/file.txt
+    ```
 
 ## Help
 
