@@ -5,6 +5,7 @@ from Reddit and Bluesky, and save them in the official corpus JSON format.
 It handles both original and rewritten content, including metadata about the
 source, content, and any transformations applied by LLMs.
 """
+
 import json
 import os
 import uuid
@@ -55,14 +56,14 @@ def save_record_to_corpus(record, directory, filename):
         record: The corpus record dictionary to save.
         directory: The directory where the record should be saved.
         filename: The name of the file to save the record in.
-        
+
     Returns:
         None
     """
     try:
         os.makedirs(directory, exist_ok=True)
         filepath = os.path.join(directory, filename)
-        with open(filepath, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(record) + '\n')
+        with open(filepath, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
     except IOError as e:
         print(f"Error: Could not write to file {filepath}. Details: {e}")

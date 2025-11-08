@@ -6,6 +6,7 @@ files. It provides feedback on the number of files processed and the total
 number of records in the combined file. The output file is named based on
 the directory and current timestamp.
 """
+
 import argparse
 import glob
 import json
@@ -36,7 +37,7 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
     output_filepath = os.path.join(directory, output_filename)
 
     # Use glob to find all files ending with .jsonl in the target directory
-    source_files = glob.glob(os.path.join(directory, '*.jsonl'))
+    source_files = glob.glob(os.path.join(directory, "*.jsonl"))
 
     # Exclude the output file from the list of source files to prevent
     # it from combining with itself
@@ -52,30 +53,34 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
 
     total_lines = 0
     seen_post_ids = set()
-    
+
     try:
         # Open the single output file in write mode
-        with open(output_filepath, 'w', encoding='utf-8') as outfile:
+        with open(output_filepath, "w", encoding="utf-8") as outfile:
             # Iterate through each source file
             for filename in source_files:
                 print(f"  -> Processing {os.path.basename(filename)}...")
-                with open(filename, 'r', encoding='utf-8') as infile:
+                with open(filename, "r", encoding="utf-8") as infile:
                     for line in infile:
                         try:
                             post = json.loads(line)
-                            post_id = post.get('corpus_item_id')
+                            post_id = post.get("corpus_item_id")
 
                             if post_id and post_id not in seen_post_ids:
                                 outfile.write(line)
                                 seen_post_ids.add(post_id)
                                 total_lines += 1
                         except json.JSONDecodeError:
-                            print(f"Warning: Could not decode JSON from line "
-                                  f"in {filename}: {line.strip()}")
+                            print(
+                                f"Warning: Could not decode JSON from line "
+                                f"in {filename}: {line.strip()}"
+                            )
 
         print("\n--- Combination Complete ---")
-        print(f"Successfully combined {len(source_files)} files into "
-              f"'{output_filename}'.")
+        print(
+            f"Successfully combined {len(source_files)} files into "
+            f"'{output_filename}'."
+        )
         print(f"The combined file contains {total_lines} records.")
 
         if delete_originals:
@@ -90,22 +95,23 @@ def combine_jsonl_files(directory: str, delete_originals: bool = False):
     except Exception as e:
         print(f"\nAn unexpected error occurred: {e}")
 
+
 if __name__ == "__main__":
     # Set up command-line argument parsing to get the target directory
     parser = argparse.ArgumentParser(
         description="Combine multiple .jsonl corpus files and delete the originals."
     )
     parser.add_argument(
-        "directory", 
-        type=str, 
-        help="The path to the directory containing the .jsonl files to combine."
+        "directory",
+        type=str,
+        help="The path to the directory containing the .jsonl files to combine.",
     )
     parser.add_argument(
-        "--delete-originals", 
-        action="store_true", 
-        help="Delete the original source files after combining."
+        "--delete-originals",
+        action="store_true",
+        help="Delete the original source files after combining.",
     )
-    
+
     args = parser.parse_args()
-    
+
     combine_jsonl_files(args.directory, args.delete_originals)

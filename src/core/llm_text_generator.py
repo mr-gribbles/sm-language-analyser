@@ -4,7 +4,9 @@ This module provides functionality to generate text using Google's Gemini API
 with robust error handling for blocked prompts and API errors. The generation
 function takes a prompt and generates new text using a specified Gemini model.
 """
+
 import os
+
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -23,8 +25,8 @@ else:
     )
 
 
-def generate_text_with_gemini(prompt, model_name):
-    """Use the Gemini API to generate text from the provided prompt.
+def process_text_with_gemini(prompt, model_name):
+    """Use the Gemini API to process text from the provided prompt.
 
     Includes robust handling for blocked prompts and API errors.
 
@@ -33,22 +35,22 @@ def generate_text_with_gemini(prompt, model_name):
         model_name: The name of the Gemini model to use for generation.
 
     Returns:
-        str or None: The generated text if successful, otherwise None. Returns None if
+        str or None: The processed text if successful, otherwise None. Returns None if
             the prompt is blocked by safety filters or if an API error occurs.
     """
     try:
         model = genai.GenerativeModel(model_name)
-        
+
         response = model.generate_content(prompt)
-        
+
         # If the response has no 'candidates', it means the prompt was blocked
         # by the safety filters.
         if not response.candidates:
             print("Warning: A prompt was blocked by the safety filter. Skipping.")
             return None
-            
+
         return response.text.strip()
-        
+
     except Exception as e:
         # This will catch other API errors, like connection issues.
         print(f"An error occurred with the Gemini API: {e}")

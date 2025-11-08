@@ -5,7 +5,9 @@ PRAW (Python Reddit API Wrapper). It reads credentials from environment
 variables and creates a single, shared client instance that can be imported
 by other parts of the application.
 """
+
 import os
+
 import praw
 from dotenv import load_dotenv
 
@@ -36,13 +38,14 @@ def initialize_reddit_client():
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
             user_agent=USER_AGENT,
-            check_for_async=False
+            check_for_async=False,
         )
         print("PRAW client initialized successfully.")
         return client
     except Exception as e:
         print(f"Failed to initialize Reddit client: {e}")
         return None
+
 
 # Create a single, reusable client instance for other modules to import
 reddit_client = initialize_reddit_client()

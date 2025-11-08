@@ -4,6 +4,7 @@ This module contains all configuration variables and settings used throughout
 the application, including API limits, directory paths, and LLM settings.
 All settings can be overridden using environment variables.
 """
+
 import os
 import random
 
@@ -53,6 +54,4 @@ REWRITE_PROMPT_TEMPLATE = os.getenv(
 
 # --- DIRECTORY SETTINGS ---
 ORIGINAL_ONLY_DIR = os.getenv("ORIGINAL_ONLY_DIR", "corpora/original_only")
-REWRITTEN_PAIRS_DIR = os.getenv(
-    "REWRITTEN_PAIRS_DIR", "corpora/rewritten_pairs"
-)
+REWRITTEN_PAIRS_DIR = os.getenv("REWRITTEN_PAIRS_DIR", "corpora/rewritten_pairs")
