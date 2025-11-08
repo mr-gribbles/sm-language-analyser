@@ -1,14 +1,12 @@
 # Social Media Language Analyser
 
-> **Branch Overview:** This branch contains the modern, command-line version of the application. It is the primary development branch for core features. For the legacy version, see the `legacy/v1.0` branch. For the web interface, see the `feature/web-gui` branch.
+> **Branch Overview:** This branch contains the modern, command-line version of the application. It is the primary development branch for core features. For the legacy version, see the `legacy/v1.0` branch.
 
 A modular Python pipeline for sourcing, cleaning, rewriting, and analyzing text data from Reddit and Bluesky to create structured corpora for NLP research.
 
 ## Description
 
 This project provides a comprehensive, end-to-end solution for building high-quality text corpora from social media platforms. It features a robust, modular architecture that separates concerns into distinct components for data sourcing, cleaning, LLM-powered rewriting, and linguistic analysis. The system includes four independent pipelines to collect both original and LLM-rewritten posts from Reddit and Bluesky, ensuring data integrity and variety. 
-
-**Check out my website for a publicly avaliable web client:** [https://sm-language.up.railway.app](https://sm-language.up.railway.app)
 
 ## Usage Workflow
 
@@ -18,7 +16,7 @@ This guide will walk you through the entire process of setting up the project, c
 
 1.  **Clone this specific branch** to your local machine:
     ```bash
-    git clone https://github.com/mr-gribbles/sm-language-analyser.git --branch v2.0-refactor
+    git clone https://github.com/mr-gribbles/sm-language-analyser.git
     cd sm-language-analyser
     ```
 2.  **Set up a Python virtual environment** to isolate dependencies. This is a crucial step to avoid conflicts with other projects.
@@ -26,9 +24,8 @@ This guide will walk you through the entire process of setting up the project, c
     python3.11 -m venv .venv
     source .venv/bin/activate
     ```
-3.  **Generate and install the required packages.** The `generate_requirements.py` script scans the project for all imported packages and creates a `requirements.txt` file.
+3.  **Install the required packages.** 
     ```bash
-    python scripts/generate_requirements.py
     pip install -r requirements.txt
     ```
 
@@ -125,20 +122,6 @@ A common issue, especially on macOS, is an `[SSL: CERTIFICATE_VERIFY_FAILED]` er
 
 ## Version History
 
-
-
-* **2.2**
-    * **Modernized Web Interface:** Complete UI/UX overhaul with modern design, responsive layout, and improved accessibility.
-    * **Removed Docker Dependency:** Simplified deployment by using Python virtual environments instead of Docker containers.
-    * **Enhanced Analysis Tools:** Improved concordance analysis with HTML report generation and automatic browser opening.
-    * **Fixed Text Overflow Issues:** Resolved UI problems with long filenames and improved responsive design.
-    * **Better Error Handling:** Enhanced error messages and troubleshooting guidance.
-* **2.1**
-    * **Added Web Interface:** Created a Flask-based web GUI for running the pipeline and managing corpora.
-    * **Dockerized Application:** Added containerization for easy deployment (later removed in v2.2).
-    * **Integrated Analysis Tools:** The web interface includes controls for running analysis, combine, and concordance scripts.
-    * **Real-Time Logging:** Implemented real-time log streaming to the web interface.
-    * **Automated SpaCy Model Download:** Scripts now automatically download required models.
 * **2.0**
     * **Complete Codebase Refactor:** Overhauled project structure for modularity and maintainability.
     * **Unified Pipeline:** Replaced four separate scripts with a single entry point.
